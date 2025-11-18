@@ -57,23 +57,23 @@ for tool in "$TOOLS_DIR"/*; do
         CURRENT_TARGET=$(readlink "$TARGET")
         if [ "$CURRENT_TARGET" = "$tool" ]; then
             echo -e "  ${GREEN}✓${NC} $TOOL_NAME (already linked)"
-            ((SKIPPED_COUNT++))
+            SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
             continue
         else
             echo -e "  ${YELLOW}↻${NC} $TOOL_NAME (updating link)"
             rm "$TARGET"
-            ((UPDATED_COUNT++))
+            UPDATED_COUNT=$((UPDATED_COUNT + 1))
         fi
     elif [ -e "$TARGET" ]; then
         echo -e "  ${YELLOW}⚠${NC} $TOOL_NAME (file exists, not a symlink - skipping)"
-        ((SKIPPED_COUNT++))
+        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
         continue
     fi
 
     # Create symlink
     ln -s "$tool" "$TARGET"
     echo -e "  ${GREEN}+${NC} $TOOL_NAME (linked)"
-    ((LINKED_COUNT++))
+    LINKED_COUNT=$((LINKED_COUNT + 1))
 done
 
 echo ""
