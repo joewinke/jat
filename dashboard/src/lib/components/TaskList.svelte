@@ -8,7 +8,8 @@
 	let {
 		selectedProject = $bindable('all'),
 		selectedPriority = $bindable('all'),
-		selectedStatus = $bindable('all')
+		selectedStatus = $bindable('all'),
+		searchQuery = $bindable('')
 	} = $props();
 
 	// State
@@ -46,6 +47,15 @@
 			if (selectedProject !== 'all' && task.project !== selectedProject) return false;
 			if (selectedPriority !== 'all' && task.priority !== parseInt(selectedPriority)) return false;
 			if (selectedStatus !== 'all' && task.status !== selectedStatus) return false;
+
+			// Search filter: match against title or description
+			if (searchQuery && searchQuery.trim()) {
+				const query = searchQuery.toLowerCase();
+				const matchTitle = task.title.toLowerCase().includes(query);
+				const matchDesc = task.description?.toLowerCase().includes(query);
+				if (!matchTitle && !matchDesc) return false;
+			}
+
 			return true;
 		})
 	);

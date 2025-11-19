@@ -4,6 +4,7 @@
 	let selectedProject = $state('all');
 	let selectedPriority = $state('all');
 	let selectedStatus = $state('all');
+	let searchQuery = $state('');
 </script>
 
 <div class="dashboard">
@@ -42,9 +43,24 @@
 				<option value="closed">Closed</option>
 			</select>
 		</div>
+
+		<div class="filter-group">
+			<label for="search-filter">Search:</label>
+			<input
+				id="search-filter"
+				type="text"
+				placeholder="Search tasks..."
+				bind:value={searchQuery}
+			/>
+		</div>
 	</div>
 
-	<TaskList bind:selectedProject bind:selectedPriority bind:selectedStatus />
+	<TaskList
+		bind:selectedProject
+		bind:selectedPriority
+		bind:selectedStatus
+		bind:searchQuery
+	/>
 </div>
 
 <style>
@@ -94,16 +110,25 @@
 		color: #374151;
 	}
 
-	.filter-group select {
+	.filter-group select,
+	.filter-group input {
 		padding: 0.5rem 0.75rem;
 		border: 1px solid #d1d5db;
 		border-radius: 0.375rem;
 		font-size: 0.875rem;
 		background: white;
+	}
+
+	.filter-group select {
 		cursor: pointer;
 	}
 
-	.filter-group select:focus {
+	.filter-group input {
+		min-width: 200px;
+	}
+
+	.filter-group select:focus,
+	.filter-group input:focus {
 		outline: none;
 		border-color: #3b82f6;
 		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
