@@ -1,11 +1,15 @@
 <script>
 	/**
 	 * TaskModal Component
-	 * Displays full task details including dependencies and dependency graph
+	 * Displays full task details including dependencies, dependency graph, and Agent Mail messages
 	 */
 
 	// Props
 	let { task = $bindable(null), onClose = () => {} } = $props();
+
+	// State
+	let messages = $state([]);
+	let loadingMessages = $state(false);
 
 	// Priority labels
 	const priorityLabels = {
@@ -15,6 +19,31 @@
 		3: 'P3 (Low)',
 		4: 'P4 (Lowest)'
 	};
+
+	// Fetch Agent Mail messages when task changes
+	$effect(() => {
+		if (task?.id) {
+			fetchMessages(task.id);
+		} else {
+			messages = [];
+		}
+	});
+
+	// Fetch Agent Mail messages for this task's thread
+	async function fetchMessages(taskId) {
+		loadingMessages = true;
+		try {
+			const response = await fetch(`/api/messages/${taskId}`);
+			if (!response.ok) throw new Error('Failed to fetch messages');
+			const data = await response.json();
+			messages = data.messages || [];
+		} catch (error) {
+			console.error('Error fetching messages:', error);
+			messages = [];
+		} finally {
+			loadingMessages = false;
+		}
+	}
 
 	// Close modal on escape key
 	function handleKeydown(event) {
@@ -28,6 +57,11 @@
 		if (event.target === event.currentTarget) {
 			onClose();
 		}
+	}
+
+	// Format timestamp
+	function formatTimestamp(timestamp) {
+		return new Date(timestamp).toLocaleString();
 	}
 </script>
 
@@ -134,6 +168,61 @@
 					</div>
 					<div class="divider"></div>
 				{/if}
+
+				<!-- Agent Mail Messages -->
+				<div>
+					<h3 class="text-lg font-semibold text-base-content mb-2">
+						Agent Mail Thread
+						{#if messages.length > 0}
+							<span class="badge badge-primary badge-sm ml-2">{messages.length}</span>
+						{/if}
+					</h3>
+
+					{#if loadingMessages}
+						<div class="flex justify-center p-4">
+							<span class="loading loading-spinner loading-sm"></span>
+						</div>
+					{:else if messages.length > 0}
+						<div class="space-y-2 max-h-96 overflow-y-auto">
+							{#each messages as message}
+								<div class="alert alert-info p-3">
+									<div class="w-full">
+										<div class="flex items-center justify-between mb-2">
+											<div class="flex items-center gap-2">
+												<span class="badge badge-ghost badge-sm">{message.from_agent}</span>
+												{#if message.importance === 'high'}
+													<span class="badge badge-error badge-sm">High Priority</span>
+												{:else if message.importance === 'urgent'}
+													<span class="badge badge-warning badge-sm">Urgent</span>
+												{/if}
+											</div>
+											<span class="text-xs text-base-content/60">
+												{formatTimestamp(message.sent_ts)}
+											</span>
+										</div>
+										<p class="text-sm font-semibold mb-1">{message.subject}</p>
+										<p class="text-sm text-base-content/80 whitespace-pre-wrap line-clamp-3">
+											{message.body}
+										</p>
+										{#if message.read_ts}
+											<div class="text-xs text-base-content/60 mt-1">
+												✓ Read {formatTimestamp(message.read_ts)}
+												{#if message.ack_ts}
+													• Acknowledged {formatTimestamp(message.ack_ts)}
+												{/if}
+											</div>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<div class="alert">
+							<span class="text-sm">No Agent Mail messages for this task yet</span>
+						</div>
+					{/if}
+				</div>
+				<div class="divider"></div>
 
 				<div>
 					<h3 class="text-lg font-semibold text-base-content mb-2">Timestamps</h3>
