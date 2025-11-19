@@ -49,10 +49,19 @@
 ./browser-nav.js https://example.com --new  # Opens in new tab
 ```
 
+**Verification Tests (KindCoast - 2025-11-19 22:19):**
+- ✅ Basic navigation to https://example.com
+- ✅ New tab navigation to https://github.com --new
+- ✅ New tab navigation to https://www.wikipedia.org --new
+- ✅ Usage message shown correctly when no arguments provided
+- ✅ Invalid URLs properly rejected by CDP (net::ERR_CONNECTION_REFUSED for unreachable hosts)
+- ✅ Protocol errors for malformed URLs (ProtocolError: Cannot navigate to invalid URL)
+
 **Notes:**
 - Navigation works flawlessly
 - Both current tab and new tab modes work
 - Fast navigation with `domcontentloaded` wait
+- Error handling delegates to Chrome's CDP (expected behavior)
 
 ---
 
