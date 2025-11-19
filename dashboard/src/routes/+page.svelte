@@ -83,6 +83,3 @@
 		bind:searchQuery
 	/>
 </div>
-
-<style>
-</style>
