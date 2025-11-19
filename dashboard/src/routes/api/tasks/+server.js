@@ -3,7 +3,7 @@
  * Provides Beads task data to the dashboard
  */
 import { json } from '@sveltejs/kit';
-import { getTasks, getProjects } from '$lib/../../../lib/beads.js';
+import { getTasks, getProjects } from '../../../../../lib/beads.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {

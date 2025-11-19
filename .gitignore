@@ -6,5 +6,10 @@ node_modules/
 .env
 .env.local
 
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
 # Agent Mail installation directory (downloaded during install)
 mcp_agent_mail/

@@ -7,6 +7,14 @@
   "scripts": {
     "test": "node test/test-beads.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joewinke/jomarchy-agent-tools.git"
+  },
+  "homepage": "https://github.com/joewinke/jomarchy-agent-tools#readme",
+  "bugs": {
+    "url": "https://github.com/joewinke/jomarchy-agent-tools/issues"
+  },
   "dependencies": {
     "better-sqlite3": "^11.10.0"
   },
@@ -14,8 +22,11 @@
     "agent-mail",
     "beads",
     "multi-agent",
-    "coordination"
+    "coordination",
+    "ai-agents",
+    "task-management",
+    "sqlite"
   ],
-  "author": "",
+  "author": "Joseph Winke <j@wn.ke>",
   "license": "MIT"
 }

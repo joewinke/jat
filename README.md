@@ -53,7 +53,7 @@ See [Complete Workflow](#complete-workflow-from-idea-to-production) below for de
 
 ## What Is This?
 
-Jomarchy Agent Tools is a **self-contained AI development environment** that gives your AI coding assistants (Claude Code, Cline, Roo Code, OpenCode, etc.) the ability to:
+Jomarchy Agent Tools is a **self-contained AI development environment** that gives your AI coding assistants (Claude Code, Cline, Codex, OpenCode, etc.) the ability to:
 
 - **Command** agent swarms with high-level coordination primitives (/start, /complete, /handoff)
 - **Coordinate** across multiple agents without conflicts (Agent Mail messaging + file locks)
@@ -1273,7 +1273,7 @@ Contributions welcome! Please open issues or PRs.
 **Known compatible tools:**
 - Claude Code (native integration)
 - Cline (bash + slash commands)
-- Roo Code (bash + slash commands)
+- Codex (bash + slash commands)
 - Continue.dev (bash tools)
 - OpenCode (bash + slash commands)
 - Any VSCode extension with terminal access
