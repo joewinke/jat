@@ -103,8 +103,9 @@ For multi-agent coordination. See `~/.claude/CLAUDE.md` for full Agent Mail docu
 
 **Quick Reference:**
 ```bash
-# Register agent
+# Register agent (required for each session)
 am-register --name AgentName --program claude-code --model sonnet-4.5
+export AGENT_NAME=AgentName  # Required for statusline to work
 
 # Reserve files
 am-reserve "src/**/*.ts" --agent AgentName --ttl 3600 --exclusive --reason "bd-123"

@@ -21,6 +21,11 @@ Follow these steps in order:
    - If resuming: Run `am-register --name AgentName --program claude-code --model sonnet-4.5`
    - If creating new: Run `am-register --program claude-code --model sonnet-4.5` (auto-generates name)
 
+3.5. **CRITICAL:** Set environment variable for statusline:
+   - Run: `export AGENT_NAME=AgentName`
+   - This enables the statusline to display your agent identity, task progress, and indicators
+   - Without this, statusline will show "no agent registered"
+
 4. Review inbox and acknowledge messages:
    - Run: `am-inbox AgentName --unread`
    - For each message: `am-ack message-id --agent AgentName`

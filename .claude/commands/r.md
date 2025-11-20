@@ -37,6 +37,16 @@ am-register --name {AgentName} --program claude-code --model sonnet-4.5
 
 If registration fails, show error message.
 
+### Step 2.5: Set Environment Variable for Statusline
+
+**CRITICAL:** Set the AGENT_NAME environment variable so the statusline displays correctly:
+
+```bash
+export AGENT_NAME={AgentName}
+```
+
+This enables the statusline to show your agent identity, task progress, and indicators.
+
 ### Step 3: Review Inbox
 
 ```bash
