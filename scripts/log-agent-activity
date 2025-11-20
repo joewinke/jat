@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+#
+# log-agent-activity - Log agent activity for orchestration dashboard
+#
+# Usage: log-agent-activity --type TYPE [options]
+#
+# Types:
+#   command   - Agent command execution (e.g., /agent:start)
+#   prompt    - User prompt/request
+#   tool      - Tool call (Read, Write, Bash, etc.)
+#   status    - General status update
+#
+# Options:
+#   --content TEXT    - Full content (for hover/details)
+#   --preview TEXT    - Short preview (shown in UI)
+#   --command NAME    - Command name (for type=command)
+#   --task ID         - Task ID (for type=command)
+#   --tool NAME       - Tool name (for type=tool)
+#   --file PATH       - File path (for type=tool)
+#
+# Examples:
+#   log-agent-activity --type command --command "agent:start" --task "task-abc" --preview "Starting task-abc"
+#   log-agent-activity --type prompt --content "fix the auth bug" --preview "User: fix the auth bug"
+#   log-agent-activity --type tool --tool "Read" --file "auth.ts" --preview "Reading auth.ts"
+
+set -euo pipefail
+
+# Show help
+if [[ $# -eq 0 ]] || [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
+    grep "^#" "$0" | sed 's/^# \?//'
+    exit 0
+fi
+
+# Parse arguments
+TYPE=""
+CONTENT=""
+PREVIEW=""
+COMMAND=""
+TASK=""
+TOOL=""
+FILE=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --type)
+            TYPE="$2"
+            shift 2
+            ;;
+        --content)
+            CONTENT="$2"
+            shift 2
+            ;;
+        --preview)
+            PREVIEW="$2"
+            shift 2
+            ;;
+        --command)
+            COMMAND="$2"
+            shift 2
+            ;;
+        --task)
+            TASK="$2"
+            shift 2
+            ;;
+        --tool)
+            TOOL="$2"
+            shift 2
+            ;;
+        --file)
+            FILE="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Validate required args
+if [[ -z "$TYPE" ]]; then
+    echo "Error: --type is required" >&2
+    exit 1
+fi
+
+# Get session ID
+SESSION_ID=$(cat .claude/current-session-id.txt 2>/dev/null | tr -d '\n' || echo "")
+if [[ -z "$SESSION_ID" ]]; then
+    echo "Error: Could not determine session ID" >&2
+    exit 1
+fi
+
+# Get agent name for this session
+AGENT_NAME=$(cat ".claude/agent-${SESSION_ID}.txt" 2>/dev/null | tr -d '\n' || echo "")
+if [[ -z "$AGENT_NAME" ]]; then
+    # No agent registered yet - skip logging
+    exit 0
+fi
+
+# Create activity log file path
+ACTIVITY_LOG=".claude/agent-${SESSION_ID}-activity.jsonl"
+
+# Ensure .claude directory exists
+mkdir -p .claude
+
+# Build JSON entry
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Start JSON object
+JSON="{\"ts\":\"$TIMESTAMP\",\"agent\":\"$AGENT_NAME\",\"type\":\"$TYPE\""
+
+# Add optional fields (use -R for raw input, no -s to avoid treating newlines as-is)
+[[ -n "$CONTENT" ]] && JSON="$JSON,\"content\":$(echo -n "$CONTENT" | jq -R .)"
+[[ -n "$PREVIEW" ]] && JSON="$JSON,\"preview\":$(echo -n "$PREVIEW" | jq -R .)"
+[[ -n "$COMMAND" ]] && JSON="$JSON,\"cmd\":$(echo -n "$COMMAND" | jq -R .)"
+[[ -n "$TASK" ]] && JSON="$JSON,\"task\":$(echo -n "$TASK" | jq -R .)"
+[[ -n "$TOOL" ]] && JSON="$JSON,\"tool\":$(echo -n "$TOOL" | jq -R .)"
+[[ -n "$FILE" ]] && JSON="$JSON,\"file\":$(echo -n "$FILE" | jq -R .)"
+
+# Close JSON object
+JSON="$JSON}"
+
+# Append to activity log
+echo "$JSON" >> "$ACTIVITY_LOG"
+
+# Keep only last 50 lines (prevent unbounded growth)
+if [[ -f "$ACTIVITY_LOG" ]]; then
+    tail -n 50 "$ACTIVITY_LOG" > "${ACTIVITY_LOG}.tmp"
+    mv "${ACTIVITY_LOG}.tmp" "$ACTIVITY_LOG"
+fi

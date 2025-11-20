@@ -16,6 +16,18 @@
  * ```
  */
 
+export interface AgentActivity {
+	ts: string;
+	agent: string;
+	type: 'command' | 'prompt' | 'tool' | 'status';
+	preview?: string;
+	content?: string;
+	cmd?: string;
+	task?: string;
+	tool?: string;
+	file?: string;
+}
+
 export interface Agent {
 	id: number;
 	name: string;
@@ -28,6 +40,8 @@ export interface Agent {
 	open_tasks: number;
 	in_progress_tasks: number;
 	active: boolean;
+	activities?: AgentActivity[];
+	current_activity?: AgentActivity | null;
 }
 
 export interface Reservation {

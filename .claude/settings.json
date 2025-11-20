@@ -1,7 +1,32 @@
 {
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/statusline.sh || ./.claude/statusline.sh",
+    "command": "./.claude/statusline.sh --debug",
     "padding": 1
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/post-bash-agent-state-refresh.sh",
+            "statusMessage": "Checking agent state changes..."
+          }
+        ]
+      },
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/log-tool-activity.sh",
+            "statusMessage": "",
+            "streamStdinJson": true
+          }
+        ]
+      }
+    ]
   }
 }

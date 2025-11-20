@@ -15,10 +15,73 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { readdir, readFile } from 'fs/promises';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { getAgents, getReservations } from '$lib/server/agent-mail.js';
 import { getTasks } from '../../../../../lib/beads.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * Read agent activity logs from .claude/agent-*-activity.jsonl files
+ * Returns last N activities per agent
+ */
+async function getAgentActivities(limit = 10) {
+	const activitiesByAgent = {};
+
+	try {
+		const claudeDir = '.claude';
+		if (!existsSync(claudeDir)) {
+			return activitiesByAgent;
+		}
+
+		// Find all activity log files
+		const files = await readdir(claudeDir);
+		const activityFiles = files.filter(f => f.includes('-activity.jsonl'));
+
+		// Read each activity log file
+		for (const file of activityFiles) {
+			try {
+				const filePath = join(claudeDir, file);
+				const content = await readFile(filePath, 'utf-8');
+				const lines = content.trim().split('\n').filter(line => line.length > 0);
+
+				// Parse JSONL and group by agent
+				for (const line of lines) {
+					try {
+						const activity = JSON.parse(line);
+						const agentName = activity.agent;
+
+						if (!agentName) continue;
+
+						if (!activitiesByAgent[agentName]) {
+							activitiesByAgent[agentName] = [];
+						}
+
+						activitiesByAgent[agentName].push(activity);
+					} catch (parseErr) {
+						// Skip malformed JSON lines
+						console.error('Failed to parse activity line:', parseErr);
+					}
+				}
+			} catch (fileErr) {
+				console.error(`Failed to read activity file ${file}:`, fileErr);
+			}
+		}
+
+		// Keep only last N activities per agent, sorted by timestamp
+		for (const agentName in activitiesByAgent) {
+			activitiesByAgent[agentName] = activitiesByAgent[agentName]
+				.sort((a, b) => new Date(b.ts) - new Date(a.ts))
+				.slice(0, limit);
+		}
+	} catch (err) {
+		console.error('Error reading agent activities:', err);
+	}
+
+	return activitiesByAgent;
+}
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
@@ -27,10 +90,11 @@ export async function GET({ url }) {
 		const agentFilter = url.searchParams.get('agent');
 
 		// Fetch all data sources in parallel for performance
-		const [agents, reservations, tasks] = await Promise.all([
+		const [agents, reservations, tasks, activities] = await Promise.all([
 			Promise.resolve(getAgents(projectFilter)),
 			Promise.resolve(getReservations(agentFilter, projectFilter)),
-			Promise.resolve(getTasks({ projectName: projectFilter }))
+			Promise.resolve(getTasks({ projectName: projectFilter })),
+			getAgentActivities(10)
 		]);
 
 		// Calculate agent statistics
@@ -49,13 +113,19 @@ export async function GET({ url }) {
 				return expiresAt > new Date() && !r.released_ts;
 			});
 
+			// Get recent activities for this agent
+			const agentActivities = activities[agent.name] || [];
+			const currentActivity = agentActivities.length > 0 ? agentActivities[0] : null;
+
 			return {
 				...agent,
 				reservation_count: agentReservations.length,
 				task_count: agentTasks.length,
 				open_tasks: openTasks,
 				in_progress_tasks: inProgressTasks,
-				active: hasActiveReservations || inProgressTasks > 0
+				active: hasActiveReservations || inProgressTasks > 0,
+				activities: agentActivities,
+				current_activity: currentActivity
 			};
 		});
 

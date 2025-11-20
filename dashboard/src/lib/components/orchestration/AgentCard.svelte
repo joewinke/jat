@@ -28,6 +28,7 @@
 	let messageBody = $state('');
 	let showClearQueueModal = $state(false);
 	let showUnassignModal = $state(false);
+	let showActivityHistory = $state(false);
 
 	// Compute agent status using $derived
 	// States: live (< 1m, truly responsive) > working (1-10m with task) > active (recent activity) > idle (within 1h) > offline (>1h)
@@ -600,8 +601,8 @@
 				<div class="space-y-1">
 					{#each agentLocks().slice(0, 2) as lock}
 						<div class="bg-warning/10 rounded px-2 py-1">
-							<p class="text-xs text-warning truncate" title={lock.file_pattern || lock.pattern}>
-								🔒 {lock.file_pattern || lock.pattern}
+							<p class="text-xs text-warning truncate" title={lock.path_pattern}>
+								🔒 {lock.path_pattern}
 							</p>
 						</div>
 					{/each}
@@ -620,24 +621,76 @@
 
 		<!-- Recent Activity Feed -->
 		<div class="mb-3">
-			<div class="text-xs font-medium text-base-content/70 mb-1">
-				Recent Activity:
+			<div class="flex items-center justify-between text-xs font-medium text-base-content/70 mb-1">
+				<span>Recent Activity:</span>
+				{#if agent.activities && agent.activities.length > 1}
+					<button
+						class="text-primary hover:text-primary-focus"
+						onclick={() => showActivityHistory = !showActivityHistory}
+					>
+						{showActivityHistory ? '▼' : '▶'} History
+					</button>
+				{/if}
 			</div>
 			<div class="bg-base-200 rounded px-2 py-1.5">
-				<div class="flex items-center justify-between text-xs">
-					<span class="text-base-content/70">Last seen:</span>
-					<span class="font-medium {agentStatus() === 'live' ? 'text-success' : agentStatus() === 'working' ? 'text-info' : 'text-base-content/50'}">
-						{formatLastActivity(agent.last_active_ts)}
-					</span>
-				</div>
-				{#if agentStatus() === 'live'}
-					<div class="flex items-center gap-1 text-xs text-success mt-1">
-						<span class="inline-block w-1.5 h-1.5 bg-success rounded-full animate-pulse"></span>
-						<span class="font-semibold">Responsive now</span>
+				{#if agent.current_activity}
+					<!-- Show current activity from activity log -->
+					<div class="flex items-center justify-between text-xs mb-1">
+						<span class="text-base-content/70">Now:</span>
+						<span class="font-medium text-success">
+							{formatLastActivity(agent.current_activity.ts)}
+						</span>
 					</div>
-				{:else if agentStatus() === 'working'}
-					<div class="text-xs text-info/70 mt-1">
-						Working on task
+					<div
+						class="flex items-center gap-1 text-xs mt-1"
+						class:text-success={agentStatus() === 'live'}
+						class:text-info={agentStatus() === 'working'}
+						class:text-base-content={agentStatus() !== 'live' && agentStatus() !== 'working'}
+						title={agent.current_activity.content || agent.current_activity.preview}
+					>
+						{#if agentStatus() === 'live'}
+							<span class="inline-block w-1.5 h-1.5 bg-success rounded-full animate-pulse"></span>
+						{/if}
+						<span class="font-semibold truncate">
+							{agent.current_activity.preview || agent.current_activity.content || 'Active'}
+						</span>
+					</div>
+				{:else}
+					<!-- Fallback to generic status if no activity log -->
+					<div class="flex items-center justify-between text-xs">
+						<span class="text-base-content/70">Last seen:</span>
+						<span class="font-medium {agentStatus() === 'live' ? 'text-success' : agentStatus() === 'working' ? 'text-info' : 'text-base-content/50'}">
+							{formatLastActivity(agent.last_active_ts)}
+						</span>
+					</div>
+					{#if agentStatus() === 'live'}
+						<div class="flex items-center gap-1 text-xs text-success mt-1">
+							<span class="inline-block w-1.5 h-1.5 bg-success rounded-full animate-pulse"></span>
+							<span class="font-semibold">Responsive now</span>
+						</div>
+					{:else if agentStatus() === 'working'}
+						<div class="text-xs text-info/70 mt-1">
+							Working on task
+						</div>
+					{/if}
+				{/if}
+
+				<!-- Activity History (expandable) -->
+				{#if showActivityHistory && agent.activities && agent.activities.length > 1}
+					<div class="mt-2 pt-2 border-t border-base-300 space-y-1">
+						{#each agent.activities.slice(1) as activity}
+							<div
+								class="text-xs text-base-content/60 flex items-start gap-1 hover:bg-base-300 rounded px-1 py-0.5 cursor-help"
+								title={activity.content || activity.preview}
+							>
+								<span class="text-base-content/40 shrink-0">
+									{new Date(activity.ts).toLocaleTimeString()}
+								</span>
+								<span class="truncate">
+									{activity.preview || activity.content || activity.type}
+								</span>
+							</div>
+						{/each}
 					</div>
 				{/if}
 			</div>
