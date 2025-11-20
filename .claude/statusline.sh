@@ -4,7 +4,7 @@
 # Shows: Agent Name | [Priority] Task ID - Task Title [Indicators]
 #
 # Features:
-#   1. Agent identification (from AGENT_NAME env var or most recently active)
+#   1. Agent identification (requires AGENT_NAME env var - set by /register)
 #   2. Task priority badge [P0/P1/P2] with color coding (Red/Yellow/Green)
 #   3. Task ID and title from Beads database
 #   4. File lock count indicator (🔒N)
@@ -12,7 +12,11 @@
 #   6. Time remaining on shortest lock (⏱Xm or Xh)
 #   7. Task progress percentage if available (N%)
 #
+# IMPORTANT: Each session must explicitly set AGENT_NAME via /register.
+# New sessions will show "no agent registered" until /register is run.
+#
 # Example output:
+#   jomarchy-agent-tools | no agent registered (new session, run /register)
 #   FreeMarsh | [P1] jomarchy-agent-tools-4p0 - Demo: Frontend... [🔒2 📬1 ⏱45m]
 #   FreeMarsh | idle [📬2]
 #
@@ -34,20 +38,17 @@ json_input=$(cat)
 # Get current working directory from JSON
 cwd=$(echo "$json_input" | jq -r '.cwd // empty')
 
-# Get agent name
+# Get agent name - ONLY from AGENT_NAME environment variable
+# Do NOT auto-detect from am-agents to avoid confusion between sessions
 agent_name=""
 
-# First check AGENT_NAME environment variable
 if [[ -n "$AGENT_NAME" ]]; then
     agent_name="$AGENT_NAME"
-elif command -v am-agents &>/dev/null; then
-    # Get most recently active agent for this project
-    agent_name=$(am-agents 2>/dev/null | grep -A 4 "^  [A-Z]" | head -5 | grep "^  " | awk '{print $1}' | head -1 || echo "")
 fi
 
-# If no agent name, show generic status
+# If no agent name, show "not registered" status
 if [[ -z "$agent_name" ]]; then
-    echo -e "${GRAY}jomarchy-agent-tools${RESET} | ${CYAN}no agent registered${RESET}"
+    echo -e "${GRAY}jomarchy-agent-tools${RESET} ${GRAY}|${RESET} ${CYAN}no agent registered${RESET}"
     exit 0
 fi
 
