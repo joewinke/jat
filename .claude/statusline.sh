@@ -1,24 +1,35 @@
 #!/bin/bash
 #
 # Claude Code statusline for jat (Jomarchy Agent Tools)
-# Shows: Agent Name | [Priority] Task ID - Task Title [Indicators]
+# Multi-line status display for agent orchestration workflows
+#
+# Line 1: Agent Name | [Priority] Task ID - Task Title [Indicators]
+# Line 2: ⎇ Git Branch | 💬 Last Prompt | 💭 Context Remaining
 #
 # Features:
-#   1. Agent identification (requires AGENT_NAME env var - set by /register)
-#   2. Task priority badge [P0/P1/P2] with color coding (Red/Yellow/Green)
-#   3. Task ID and title from Beads database
-#   4. File lock count indicator (🔒N)
-#   5. Unread messages count (📬N)
-#   6. Time remaining on shortest lock (⏱Xm or Xh)
-#   7. Task progress percentage if available (N%)
+#   Agent Status (Line 1):
+#     1. Agent identification (requires AGENT_NAME env var - set by /register)
+#     2. Task priority badge [P0/P1/P2] with color coding (Red/Yellow/Green)
+#     3. Task ID and title from Beads database
+#     4. File lock count indicator (🔒N)
+#     5. Unread messages count (📬N)
+#     6. Time remaining on shortest lock (⏱Xm or Xh)
+#     7. Task progress percentage if available (N%)
+#
+#   Context & Git (Line 2):
+#     8. Git branch display (⎇ branch-name)
+#     9. Last user prompt from transcript (truncated to 80 chars)
+#    10. Context remaining percentage (color-coded: >50% green, >25% yellow, <25% red)
 #
 # IMPORTANT: Each session must explicitly set AGENT_NAME via /register.
 # New sessions will show "no agent registered" until /register is run.
 #
 # Example output:
-#   jat | no agent registered (new session, run /register)
 #   FreeMarsh | [P1] jomarchy-agent-tools-4p0 - Demo: Frontend... [🔒2 📬1 ⏱45m]
-#   FreeMarsh | idle [📬2]
+#   ⎇ master | 💬 yes implement top 3 | 💭 67%
+#
+#   jat | no agent registered (new session, run /register)
+#   ⎇ master | 💭 95%
 #
 
 # ANSI color codes
@@ -35,9 +46,37 @@ BOLD='\033[1m'
 # Read JSON from stdin (provided by Claude Code)
 json_input=$(cat)
 
+# Debug logging (only if --debug flag is passed via settings.json)
+if [[ "$1" == "--debug" ]]; then
+    debug_log="/tmp/claude-statusline-debug.log"
+    {
+        echo "=== Statusline Debug $(date) ==="
+        echo "$json_input" | jq '.'
+        echo ""
+    } >> "$debug_log"
+fi
+
 # Get session info from JSON
 cwd=$(echo "$json_input" | jq -r '.cwd // empty')
 session_id=$(echo "$json_input" | jq -r '.session_id // empty')
+transcript_path=$(echo "$json_input" | jq -r '.transcript_path // empty')
+
+# Get context usage from transcript (for context remaining indicator)
+# The JSON input doesn't have usage info, so we read from the transcript
+context_used=0
+context_limit=200000
+
+if [[ -n "$transcript_path" ]] && [[ -f "$transcript_path" ]]; then
+    # Get the most recent assistant message with usage info
+    last_usage=$(tail -20 "$transcript_path" 2>/dev/null | \
+        jq -r 'select(.message.role == "assistant") | .message.usage |
+               (.input_tokens // 0) + (.cache_read_input_tokens // 0)' 2>/dev/null | \
+        tail -1)
+
+    if [[ -n "$last_usage" ]] && [[ "$last_usage" != "null" ]] && [[ "$last_usage" != "0" ]]; then
+        context_used=$last_usage
+    fi
+fi
 
 # Store session_id for slash commands to access
 # (Commands don't get JSON input, so we persist it for them)
@@ -57,9 +96,60 @@ elif [[ -n "$AGENT_NAME" ]]; then
     agent_name="$AGENT_NAME"
 fi
 
-# If no agent name, show "not registered" status
+# Get git branch if in a git repo
+git_branch=""
+if [[ -n "$cwd" ]] && [[ -d "$cwd/.git" ]]; then
+    cd "$cwd" 2>/dev/null || true
+    git_branch=$(git branch --show-current 2>/dev/null || echo "")
+fi
+
+# Get last user prompt from transcript
+last_prompt=""
+if [[ -n "$transcript_path" ]] && [[ -f "$transcript_path" ]]; then
+    # Extract the last user message from transcript (JSONL format)
+    # Look for entries with type="user" and content that is a text message (not tool result)
+    last_prompt=$(tac "$transcript_path" 2>/dev/null | \
+        jq -r 'select(.type == "user") |
+               if (.message.content | type) == "array" then
+                   .message.content[] | select(.type == "text") | .text
+               elif (.message.content | type) == "string" then
+                   .message.content
+               else
+                   empty
+               end' 2>/dev/null | \
+        grep -v "^$" | head -1)
+    # Truncate to 80 characters
+    if [[ -n "$last_prompt" ]] && [[ ${#last_prompt} -gt 80 ]]; then
+        last_prompt="${last_prompt:0:77}..."
+    fi
+fi
+
+# Calculate context remaining percentage
+context_remaining=""
+if [[ $context_used -gt 0 ]] && [[ $context_limit -gt 0 ]]; then
+    context_percent=$((100 - (context_used * 100 / context_limit)))
+    context_remaining="${context_percent}%"
+fi
+
+# If no agent name, show "not registered" status with git branch and context
 if [[ -z "$agent_name" ]]; then
-    echo -e "${GRAY}jat${RESET} ${GRAY}|${RESET} ${CYAN}no agent registered${RESET}"
+    base_status="${GRAY}jat${RESET} ${GRAY}|${RESET} ${CYAN}no agent registered${RESET}"
+
+    # Build second line with git branch and context
+    second_line=""
+    if [[ -n "$git_branch" ]]; then
+        second_line="${second_line}${MAGENTA}⎇${RESET} ${git_branch}"
+    fi
+    if [[ -n "$context_remaining" ]]; then
+        [[ -n "$second_line" ]] && second_line="${second_line} ${GRAY}|${RESET} "
+        second_line="${second_line}${CYAN}💭${RESET} ${context_remaining}"
+    fi
+
+    if [[ -n "$second_line" ]]; then
+        echo -e "${base_status}\n${second_line}"
+    else
+        echo -e "${base_status}"
+    fi
     exit 0
 fi
 
@@ -216,4 +306,39 @@ else
     status_line="${GRAY}jat${RESET}"
 fi
 
-echo -e "$status_line"
+# Build second line with git branch, last prompt, and context remaining
+second_line=""
+
+# Add git branch
+if [[ -n "$git_branch" ]]; then
+    second_line="${second_line}${MAGENTA}⎇${RESET} ${git_branch}"
+fi
+
+# Add last user prompt
+if [[ -n "$last_prompt" ]]; then
+    [[ -n "$second_line" ]] && second_line="${second_line} ${GRAY}|${RESET} "
+    second_line="${second_line}${YELLOW}💬${RESET} ${last_prompt}"
+fi
+
+# Add context remaining
+if [[ -n "$context_remaining" ]]; then
+    [[ -n "$second_line" ]] && second_line="${second_line} ${GRAY}|${RESET} "
+
+    # Color code based on remaining context
+    if [[ $context_percent -gt 50 ]]; then
+        context_color="${GREEN}"
+    elif [[ $context_percent -gt 25 ]]; then
+        context_color="${YELLOW}"
+    else
+        context_color="${RED}"
+    fi
+
+    second_line="${second_line}${CYAN}💭${RESET} ${context_color}${context_remaining}${RESET}"
+fi
+
+# Output status line(s)
+if [[ -n "$second_line" ]]; then
+    echo -e "${status_line}\n${second_line}"
+else
+    echo -e "$status_line"
+fi

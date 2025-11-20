@@ -98,6 +98,28 @@ File Locks    Dependencies  (db, browser, etc)
 4. **Beads** manages task queue with dependency resolution
 5. **Tools** perform operations (database, browser, monitoring, etc.)
 
+### 📊 Real-Time Statusline
+
+The installer automatically sets up a multi-line statusline in Claude Code that shows:
+
+**Line 1:** Agent identity, current task, priority, file locks, messages, time remaining
+```
+WiseStar | [P1] jat-m95 - Update /start... [🔒2 📬1 ⏱45m]
+```
+
+**Line 2:** Git branch, last command, context remaining (color-coded)
+```
+⎇ master | 💬 yes implement top 3 | 💭 67%
+```
+
+Features:
+- **Session-aware**: Each Claude Code terminal has its own agent identity
+- **Real-time updates**: Automatically refreshes when you run `am-*` or `bd` commands
+- **Color-coded**: Priority badges (P0=red, P1=yellow, P2=green), context warnings
+- **Multi-agent ready**: Run multiple agents in different terminals simultaneously
+
+No configuration needed - works automatically after installation!
+
 ---
 
 ## Why Use This?
@@ -543,6 +565,7 @@ This installs:
 - ✅ Beads CLI (`bd` command)
 - ✅ 28 generic bash tools (am-*, browser-*, db-*, etc.)
 - ✅ 10 coordination commands (/register, /start, /complete, /handoff, etc.)
+- ✅ Multi-line statusline (agent, task, git, context) + real-time hooks
 - ✅ Optional tech stack tools (e.g., SvelteKit + Supabase with 11 additional tools)
 - ✅ Global ~/.claude/CLAUDE.md configuration
 - ✅ Per-repo setup (bd init, CLAUDE.md templates)
@@ -564,6 +587,7 @@ This installs:
 - ✅ Beads CLI (task management)
 - ✅ 28 generic bash tools
 - ✅ 10 coordination commands
+- ✅ Multi-line statusline + real-time hooks (Claude Code)
 
 **What You DON'T Need:**
 - ❌ No HTTP servers to run
