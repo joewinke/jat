@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import TaskQueue from '$lib/components/orchestration/TaskQueue.svelte';
 	import AgentGrid from '$lib/components/orchestration/AgentGrid.svelte';
+	import SystemCapacityBar from '$lib/components/orchestration/SystemCapacityBar.svelte';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
 
 	let tasks = $state([]);
@@ -125,7 +126,7 @@
 	</div>
 
 	<!-- Main Content: Sidebar + Agent Grid -->
-	<div class="flex h-[calc(100vh-theme(spacing.20))]">
+	<div class="flex h-[calc(100vh-theme(spacing.20))] pb-20">
 		<!-- Left Sidebar: Task Queue -->
 		<div class="w-80 border-r border-base-300 bg-base-100 flex flex-col">
 			<TaskQueue tasks={unassignedTasks} {agents} {reservations} />
@@ -136,4 +137,7 @@
 			<AgentGrid {agents} {tasks} {reservations} onTaskAssign={handleTaskAssign} />
 		</div>
 	</div>
+
+	<!-- System-Wide Capacity Bar (Fixed Bottom) -->
+	<SystemCapacityBar {agents} {tasks} />
 </div>

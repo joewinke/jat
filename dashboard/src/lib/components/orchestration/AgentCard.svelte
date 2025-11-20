@@ -1,4 +1,7 @@
 <script>
+	import CapacityBar from '$lib/components/CapacityBar.svelte';
+	import { calculateAgentCapacity } from '$lib/utils/capacityCalculations';
+
 	let { agent, tasks = [], reservations = [], onTaskAssign = () => {}, draggedTaskId = null } = $props();
 
 	let isDragOver = $state(false);
@@ -131,17 +134,9 @@
 		);
 	});
 
-	// Compute task capacity (simple load indicator based on task count)
-	const MAX_TASKS = 10; // Maximum recommended tasks per agent
-	const taskCapacity = $derived(() => {
-		const totalActiveTasks = (agent.in_progress_tasks || 0) + (agent.open_tasks || 0);
-		const percentage = Math.min((totalActiveTasks / MAX_TASKS) * 100, 100);
-		return {
-			total: totalActiveTasks,
-			max: MAX_TASKS,
-			percentage,
-			status: percentage < 50 ? 'good' : percentage < 80 ? 'moderate' : 'high'
-		};
+	// Compute enhanced capacity (hour-based estimation)
+	const agentCapacity = $derived(() => {
+		return calculateAgentCapacity(agent, tasks, 8);
 	});
 
 	// Format last activity time
@@ -599,22 +594,17 @@
 			{/if}
 		</div>
 
-		<!-- Capacity Indicator -->
+		<!-- Enhanced Capacity Indicator with Hour-based Estimates -->
 		<div class="mb-3">
-			<div class="text-xs font-medium text-base-content/70 mb-1">
-				Capacity: {taskCapacity().total}/{taskCapacity().max} tasks
-			</div>
-			<div class="flex items-center gap-2">
-				<div class="flex-1 bg-base-300 rounded-full h-2">
-					<div
-						class="h-2 rounded-full transition-all {taskCapacity().status === 'good' ? 'bg-success' : taskCapacity().status === 'moderate' ? 'bg-warning' : 'bg-error'}"
-						style="width: {taskCapacity().percentage}%"
-					></div>
-				</div>
-				<span class="text-xs font-medium {taskCapacity().status === 'good' ? 'text-success' : taskCapacity().status === 'moderate' ? 'text-warning' : 'text-error'}">
-					{Math.round(taskCapacity().percentage)}%
-				</span>
-			</div>
+			<CapacityBar
+				usedHours={agentCapacity().usedHours}
+				availableHours={agentCapacity().availableHours}
+				percentage={agentCapacity().percentage}
+				status={agentCapacity().status}
+				tasksBreakdown={agentCapacity().tasksBreakdown}
+				showLabel={true}
+				size="md"
+			/>
 		</div>
 
 		<!-- Drop Zone Indicator -->
