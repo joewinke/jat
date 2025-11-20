@@ -21,6 +21,10 @@ Usage: am-register [options]
 
 Register or resume an agent identity in Agent Mail.
 
+IMPORTANT: Agent names are globally unique across all projects.
+If an agent name already exists, this command will resume that agent
+(updating last_active timestamp) instead of creating a duplicate.
+
 Options:
   --name NAME         Agent name (adjective+noun, omit to auto-generate)
   --program PROGRAM   Program name (default: claude-code)
@@ -81,21 +85,23 @@ PROJECT_ID=$(am_get_project "$AGENT_MAIL_DB" "$PROJECT")
 
 # Generate name if not provided
 if [[ -z "$NAME" ]]; then
-    # Try to find an unused name
+    # Try to find an unused name (check globally, not per-project)
     for attempt in {1..10}; do
         NAME=$(am_generate_name)
-        existing=$(sqlite3 "$AGENT_MAIL_DB" "SELECT COUNT(*) FROM agents WHERE project_id = $PROJECT_ID AND name = '$NAME';")
+        existing=$(sqlite3 "$AGENT_MAIL_DB" "SELECT COUNT(*) FROM agents WHERE name = '$NAME';")
         if [[ "$existing" == "0" ]]; then
             break
         fi
     done
 fi
 
-# Check if agent already exists
-AGENT_ID=$(sqlite3 "$AGENT_MAIL_DB" "SELECT id FROM agents WHERE project_id = $PROJECT_ID AND name = '$NAME';")
+# Check if agent already exists (globally across all projects)
+AGENT_ID=$(sqlite3 "$AGENT_MAIL_DB" "SELECT id FROM agents WHERE name = '$NAME';")
+AGENT_EXISTS=false
 
 if [[ -n "$AGENT_ID" ]]; then
-    # Agent exists - update it
+    # Agent exists globally - resume by updating last_active
+    AGENT_EXISTS=true
     sqlite3 "$AGENT_MAIL_DB" <<SQL
 UPDATE agents
 SET program = '$PROGRAM',
@@ -105,7 +111,7 @@ SET program = '$PROGRAM',
 WHERE id = $AGENT_ID;
 SQL
 else
-    # Create new agent and get the ID in the same connection
+    # Create new agent (name is globally unique)
     AGENT_ID=$(sqlite3 "$AGENT_MAIL_DB" <<SQL
 INSERT INTO agents (project_id, name, program, model, task_description)
 VALUES ($PROJECT_ID, '$NAME', '$PROGRAM', '$MODEL', '$TASK');
@@ -138,7 +144,11 @@ else
     TASK_VAL=$(echo "$AGENT" | jq -r '.[0].task_description')
     LAST_ACTIVE=$(echo "$AGENT" | jq -r '.[0].last_active_ts')
 
-    am_success "Registered: $NAME_VAL"
+    if [[ "$AGENT_EXISTS" == "true" ]]; then
+        am_success "✅ Resuming existing agent: $NAME_VAL"
+    else
+        am_success "✨ Created new agent: $NAME_VAL"
+    fi
     echo "  Program: $PROGRAM_VAL"
     echo "  Model: $MODEL_VAL"
     echo "  Task: ${TASK_VAL:-(none)}"
