@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Check if an agent is actively working (has recent session file)
+#
+# Usage: check-agent-active AGENT_NAME [MAX_AGE_MINUTES]
+#
+# Returns:
+#   0 - Agent is active (session file exists and is recent)
+#   1 - Agent is not active (no session file or file is old)
+#
+# Default MAX_AGE_MINUTES is 10 (session file must be modified within last 10 minutes)
+
+set -e
+
+AGENT_NAME="$1"
+MAX_AGE_MINUTES="${2:-10}"
+
+if [[ -z "$AGENT_NAME" ]]; then
+    echo "Error: Agent name required" >&2
+    echo "Usage: check-agent-active AGENT_NAME [MAX_AGE_MINUTES]" >&2
+    exit 2
+fi
+
+# Find session files for this agent
+session_files=$(grep -l "^${AGENT_NAME}$" .claude/agent-*.txt 2>/dev/null || true)
+
+if [[ -z "$session_files" ]]; then
+    # No session files found
+    exit 1
+fi
+
+# Check if any session file is recent (modified within MAX_AGE_MINUTES)
+current_time=$(date +%s)
+max_age_seconds=$((MAX_AGE_MINUTES * 60))
+
+for session_file in $session_files; do
+    file_time=$(stat -c %Y "$session_file" 2>/dev/null || echo 0)
+    age=$((current_time - file_time))
+
+    if [[ $age -lt $max_age_seconds ]]; then
+        # Found a recent session file - agent is active
+        echo "$session_file"
+        exit 0
+    fi
+done
+
+# All session files are old - agent is not active
+exit 1

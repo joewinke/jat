@@ -171,13 +171,13 @@ After determining AGENT_NAME (from any path above), check if already active:
 ~/code/jat/scripts/get-current-session-id
 # → "a019c84c-7b54-45cc-9eee-dd6a70dea1a3"
 
-# Step 2: Check if agent already active in another session (use Bash tool)
-grep -l "AgentName" .claude/agent-*.txt 2>/dev/null || echo "Not active"
-# → If found: shows filename like ".claude/agent-9b2a2fac....txt"
-# → If not found: shows "Not active"
+# Step 2: Check if agent is ACTIVELY working (session file modified in last 10 min)
+~/code/jat/scripts/check-agent-active "AgentName" 10 && echo "ACTIVE" || echo "NOT_ACTIVE"
+# → If ACTIVE: shows session filename and exits with 0
+# → If NOT_ACTIVE: exits with 1
 
-# Step 3: If agent IS active in another session, show error and exit
-# (Compare found session ID to current session ID from step 1)
+# Step 3: If agent IS actively working, show error and exit
+# If agent is NOT actively working (old session file), OK to proceed
 
 # Step 4: Write agent name to session file (use Write tool)
 Write(.claude/agent-a019c84c-7b54-45cc-9eee-dd6a70dea1a3.txt, "AgentName")
@@ -233,13 +233,14 @@ if [[ "$AGENT_COUNT" -gt 0 ]]; then
   am-agents --json | jq -r '.[] | "  • \(.name) (last active: \(.last_active_ts // "never"))"'
   echo ""
 
-  # Check which agents are currently active in sessions
-  echo "Checking which agents are active in other sessions..."
-  for agent_file in .claude/agent-*.txt; do
-    [[ -f "$agent_file" ]] || continue
-    agent=$(cat "$agent_file" | tr -d '\n')
-    session=$(basename "$agent_file" | sed 's/agent-//;s/.txt//')
-    echo "  ⚠️  $agent is active in session ${session:0:8}..."
+  # Check which agents are ACTIVELY working (session file modified in last 10 minutes)
+  echo "Checking which agents are actively working..."
+  am-agents --json | jq -r '.[].name' | while read agent_name; do
+    if ~/code/jat/scripts/check-agent-active "$agent_name" 10 >/dev/null 2>&1; then
+      session_file=$(~/code/jat/scripts/check-agent-active "$agent_name" 10)
+      session=$(basename "$session_file" | sed 's/agent-//;s/.txt//')
+      echo "  ⚠️  $agent_name is ACTIVELY working in session ${session:0:8}..."
+    fi
   done
   echo ""
 
@@ -276,9 +277,11 @@ fi
 When existing agents are found:
 1. **Recommend "Create new agent"** (simplest, no conflicts)
 2. If user wants to resume existing agent:
-   - Check if it's active elsewhere (grep agent name in .claude/agent-*.txt)
-   - If active: show error, ask them to choose different option
-   - If not active: OK to proceed
+   - Check if it's ACTIVELY working: `~/code/jat/scripts/check-agent-active AgentName 10`
+   - If actively working (session file < 10 min old): show error, ask them to choose different option
+   - If not actively working (no session file or file > 10 min old): OK to proceed
+
+**Note:** A session file older than 10 minutes is considered INACTIVE (agent probably crashed or terminal closed without cleanup)
 
 **CRITICAL: Check for duplicate active agents and write to session file:**
 
