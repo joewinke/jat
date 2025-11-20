@@ -14,7 +14,7 @@
 	// Fetch orchestration data from unified API
 	async function fetchData() {
 		try {
-			const response = await fetch('/api/orchestration');
+			const response = await fetch('/api/agents?full=true');
 			const data = await response.json();
 
 			if (data.error) {
@@ -36,7 +36,8 @@
 	// Handle task assignment via drag-and-drop
 	async function handleTaskAssign(taskId, agentName) {
 		try {
-			const response = await fetch('/api/orchestration', {
+			// TODO: Implement task assignment endpoint or use bd CLI directly
+			const response = await fetch('/api/agents?full=true', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
