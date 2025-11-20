@@ -78,7 +78,7 @@
 	<div class="navbar bg-base-100 border-b border-base-300">
 		<div class="flex-1">
 			<div>
-				<h1 class="text-2xl font-bold text-base-content">Agent Orchestration</h1>
+				<h1 class="text-2xl font-bold text-base-content">Agents</h1>
 				<p class="text-sm text-base-content/70">
 					Task assignment and agent coordination powered by Agent Mail + Beads
 				</p>
