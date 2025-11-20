@@ -1,16 +1,52 @@
 <script>
 	import { dndzone } from 'svelte-dnd-action';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 
 	let { tasks = [], agents = [], reservations = [] } = $props();
 
+	// Initialize filters from URL params
 	let searchQuery = $state('');
 	let priorityFilter = $state('all');
 	let statusFilter = $state('all');
-	let labelFilter = $state('all');
+	let typeFilter = $state('all');
+	let selectedLabels = $state(new Set());
 	let dragDisabled = $state(true);
 
-	// Compute filtered tasks using $derived
-	const filteredTasks = $derived(() => {
+	// Sync filters with URL on mount and page changes
+	$effect(() => {
+		const params = new URLSearchParams(window.location.search);
+		searchQuery = params.get('search') || '';
+		priorityFilter = params.get('priority') || 'all';
+		statusFilter = params.get('status') || 'all';
+		typeFilter = params.get('type') || 'all';
+
+		const labels = params.get('labels');
+		if (labels) {
+			selectedLabels = new Set(labels.split(','));
+		} else {
+			selectedLabels = new Set();
+		}
+	});
+
+	// Update URL when filters change
+	function updateURL() {
+		const params = new URLSearchParams();
+
+		if (searchQuery) params.set('search', searchQuery);
+		if (priorityFilter !== 'all') params.set('priority', priorityFilter);
+		if (statusFilter !== 'all') params.set('status', statusFilter);
+		if (typeFilter !== 'all') params.set('type', typeFilter);
+		if (selectedLabels.size > 0) {
+			params.set('labels', Array.from(selectedLabels).join(','));
+		}
+
+		const newURL = params.toString() ? `?${params.toString()}` : window.location.pathname;
+		window.history.replaceState({}, '', newURL);
+	}
+
+	// Compute filtered tasks using $derived.by()
+	const filteredTasks = $derived.by(() => {
 		let result = tasks;
 
 		// Filter by search
@@ -33,22 +69,60 @@
 			result = result.filter((task) => task.status === statusFilter);
 		}
 
-		// Filter by label
-		if (labelFilter !== 'all') {
-			result = result.filter((task) => task.labels?.includes(labelFilter));
+		// Filter by type
+		if (typeFilter !== 'all') {
+			result = result.filter((task) => task.issue_type === typeFilter);
+		}
+
+		// Filter by labels (AND logic: task must have ALL selected labels)
+		if (selectedLabels.size > 0) {
+			result = result.filter((task) => {
+				const taskLabels = task.labels || [];
+				return Array.from(selectedLabels).every((label) => taskLabels.includes(label));
+			});
 		}
 
 		return result;
 	});
 
 	// Get unique labels from tasks
-	const availableLabels = $derived(() => {
+	const availableLabels = $derived.by(() => {
 		const labelsSet = new Set();
 		tasks.forEach((task) => {
 			task.labels?.forEach((label) => labelsSet.add(label));
 		});
 		return Array.from(labelsSet).sort();
 	});
+
+	// Get unique types from tasks
+	const availableTypes = $derived.by(() => {
+		const typesSet = new Set();
+		tasks.forEach((task) => {
+			if (task.issue_type) typesSet.add(task.issue_type);
+		});
+		return Array.from(typesSet).sort();
+	});
+
+	// Toggle label selection
+	function toggleLabel(label) {
+		if (selectedLabels.has(label)) {
+			selectedLabels.delete(label);
+		} else {
+			selectedLabels.add(label);
+		}
+		selectedLabels = new Set(selectedLabels); // Trigger reactivity
+		updateURL();
+	}
+
+	// Clear all filters
+	function clearAllFilters() {
+		searchQuery = '';
+		priorityFilter = 'all';
+		statusFilter = 'all';
+		typeFilter = 'all';
+		selectedLabels = new Set();
+		updateURL();
+	}
 
 	// Priority badge colors
 	function getPriorityBadge(priority) {
@@ -92,12 +166,17 @@
 			placeholder="Search tasks..."
 			class="input input-bordered input-sm w-full mb-3"
 			bind:value={searchQuery}
+			oninput={() => updateURL()}
 		/>
 
 		<!-- Filters -->
 		<div class="flex flex-col gap-2">
 			<!-- Priority Filter -->
-			<select class="select select-bordered select-sm w-full" bind:value={priorityFilter}>
+			<select
+				class="select select-bordered select-sm w-full"
+				bind:value={priorityFilter}
+				onchange={() => updateURL()}
+			>
 				<option value="all">All Priorities</option>
 				<option value="0">P0 (Critical)</option>
 				<option value="1">P1 (High)</option>
@@ -106,28 +185,138 @@
 			</select>
 
 			<!-- Status Filter -->
-			<select class="select select-bordered select-sm w-full" bind:value={statusFilter}>
+			<select
+				class="select select-bordered select-sm w-full"
+				bind:value={statusFilter}
+				onchange={() => updateURL()}
+			>
 				<option value="all">All Statuses</option>
 				<option value="open">Open</option>
 				<option value="blocked">Blocked</option>
 				<option value="ready">Ready</option>
 			</select>
 
-			<!-- Label Filter -->
-			{#if availableLabels().length > 0}
-				<select class="select select-bordered select-sm w-full" bind:value={labelFilter}>
-					<option value="all">All Labels</option>
-					{#each availableLabels() as label}
-						<option value={label}>{label}</option>
+			<!-- Type Filter -->
+			{#if availableTypes.length > 0}
+				<select
+					class="select select-bordered select-sm w-full"
+					bind:value={typeFilter}
+					onchange={() => updateURL()}
+				>
+					<option value="all">All Types</option>
+					{#each availableTypes as type}
+						<option value={type}>{type}</option>
 					{/each}
 				</select>
 			{/if}
+
+			<!-- Multi-select Label Filter -->
+			{#if availableLabels.length > 0}
+				<div class="form-control">
+					<label class="label py-1">
+						<span class="label-text text-xs">Labels ({selectedLabels.size} selected)</span>
+					</label>
+					<div class="bg-base-200 rounded-lg p-2 max-h-40 overflow-y-auto">
+						{#each availableLabels as label}
+							<label class="label cursor-pointer py-1">
+								<span class="label-text text-xs">{label}</span>
+								<input
+									type="checkbox"
+									class="checkbox checkbox-xs checkbox-primary"
+									checked={selectedLabels.has(label)}
+									onchange={() => toggleLabel(label)}
+								/>
+							</label>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
+
+		<!-- Active Filters as Badges -->
+		{#if searchQuery || priorityFilter !== 'all' || statusFilter !== 'all' || typeFilter !== 'all' || selectedLabels.size > 0}
+			<div class="mt-3 mb-2">
+				<div class="text-xs text-base-content/50 mb-1">Active Filters:</div>
+				<div class="flex flex-wrap gap-1">
+					{#if searchQuery}
+						<span class="badge badge-sm badge-primary gap-1">
+							🔍 {searchQuery}
+							<button
+								class="btn btn-ghost btn-xs p-0 h-auto min-h-0"
+								onclick={() => {
+									searchQuery = '';
+									updateURL();
+								}}
+							>
+								✕
+							</button>
+						</span>
+					{/if}
+
+					{#if priorityFilter !== 'all'}
+						<span class="badge badge-sm badge-warning gap-1">
+							P{priorityFilter}
+							<button
+								class="btn btn-ghost btn-xs p-0 h-auto min-h-0"
+								onclick={() => {
+									priorityFilter = 'all';
+									updateURL();
+								}}
+							>
+								✕
+							</button>
+						</span>
+					{/if}
+
+					{#if statusFilter !== 'all'}
+						<span class="badge badge-sm badge-info gap-1">
+							{statusFilter}
+							<button
+								class="btn btn-ghost btn-xs p-0 h-auto min-h-0"
+								onclick={() => {
+									statusFilter = 'all';
+									updateURL();
+								}}
+							>
+								✕
+							</button>
+						</span>
+					{/if}
+
+					{#if typeFilter !== 'all'}
+						<span class="badge badge-sm badge-accent gap-1">
+							{typeFilter}
+							<button
+								class="btn btn-ghost btn-xs p-0 h-auto min-h-0"
+								onclick={() => {
+									typeFilter = 'all';
+									updateURL();
+								}}
+							>
+								✕
+							</button>
+						</span>
+					{/if}
+
+					{#each Array.from(selectedLabels) as label}
+						<span class="badge badge-sm badge-ghost gap-1">
+							{label}
+							<button
+								class="btn btn-ghost btn-xs p-0 h-auto min-h-0"
+								onclick={() => toggleLabel(label)}
+							>
+								✕
+							</button>
+						</span>
+					{/each}
+				</div>
+			</div>
+		{/if}
 
 		<!-- Task Count -->
 		<div class="mt-3 text-sm text-base-content/70">
-			{filteredTasks().length} task{filteredTasks().length !== 1 ? 's' : ''}
-			{#if filteredTasks().length !== tasks.length}
+			{filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}
+			{#if filteredTasks.length !== tasks.length}
 				of {tasks.length} total
 			{/if}
 		</div>
@@ -135,7 +324,7 @@
 
 	<!-- Task List -->
 	<div class="flex-1 overflow-y-auto p-4 space-y-2">
-		{#if filteredTasks().length === 0}
+		{#if filteredTasks.length === 0}
 			<div class="text-center py-8 text-base-content/50">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -152,22 +341,14 @@
 					/>
 				</svg>
 				<p>No tasks found</p>
-				{#if searchQuery || priorityFilter !== 'all' || statusFilter !== 'all' || labelFilter !== 'all'}
-					<button
-						class="btn btn-sm btn-ghost mt-2"
-						onclick={() => {
-							searchQuery = '';
-							priorityFilter = 'all';
-							statusFilter = 'all';
-							labelFilter = 'all';
-						}}
-					>
+				{#if searchQuery || priorityFilter !== 'all' || statusFilter !== 'all' || typeFilter !== 'all' || selectedLabels.size > 0}
+					<button class="btn btn-sm btn-ghost mt-2" onclick={clearAllFilters}>
 						Clear filters
 					</button>
 				{/if}
 			</div>
 		{:else}
-			{#each filteredTasks() as task (task.id)}
+			{#each filteredTasks as task (task.id)}
 				<div
 					class="card bg-base-100 border border-base-300 hover:border-primary cursor-move transition-all {!dragDisabled ? 'opacity-50' : ''}"
 					draggable="true"
