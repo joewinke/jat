@@ -35,18 +35,26 @@ BOLD='\033[1m'
 # Read JSON from stdin (provided by Claude Code)
 json_input=$(cat)
 
-# Get current working directory from JSON
+# Get session info from JSON
 cwd=$(echo "$json_input" | jq -r '.cwd // empty')
+session_id=$(echo "$json_input" | jq -r '.session_id // empty')
 
-# Get agent name from multiple sources (priority order):
-# 1. AGENT_NAME environment variable (if set)
-# 2. .claude/current-agent.txt file (persists across session)
+# Store session_id for slash commands to access
+# (Commands don't get JSON input, so we persist it for them)
+if [[ -n "$session_id" ]] && [[ -n "$cwd" ]]; then
+    echo "$session_id" > "$cwd/.claude/current-session-id.txt" 2>/dev/null
+fi
+
+# Get agent name from session-specific file
+# Each Claude Code session gets its own agent identity file
 agent_name=""
 
-if [[ -n "$AGENT_NAME" ]]; then
+if [[ -n "$session_id" ]] && [[ -f "$cwd/.claude/agent-${session_id}.txt" ]]; then
+    # Read from session-specific file (supports multiple concurrent agents)
+    agent_name=$(cat "$cwd/.claude/agent-${session_id}.txt" 2>/dev/null | tr -d '\n')
+elif [[ -n "$AGENT_NAME" ]]; then
+    # Fall back to environment variable if set
     agent_name="$AGENT_NAME"
-elif [[ -f "$cwd/.claude/current-agent.txt" ]]; then
-    agent_name=$(cat "$cwd/.claude/current-agent.txt" 2>/dev/null | tr -d '\n')
 fi
 
 # If no agent name, show "not registered" status
