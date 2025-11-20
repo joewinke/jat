@@ -22,6 +22,59 @@ Get to work! Unified smart command that handles registration, task selection, co
 
 ---
 
+## Bash Syntax Patterns for Claude Code
+
+**CRITICAL:** Claude Code's Bash tool escapes command substitution syntax. You MUST use these patterns:
+
+### ✅ CORRECT Patterns
+
+**Pattern 1: Use Read/Write tools (RECOMMENDED)**
+```bash
+# Step 1: Get value
+~/code/jat/scripts/get-current-session-id
+# → "a019c84c-7b54-45cc-9eee-dd6a70dea1a3"
+
+# Step 2: Use Write tool with that value
+Write(.claude/agent-a019c84c-7b54-45cc-9eee-dd6a70dea1a3.txt, "AgentName")
+```
+
+**Pattern 2: Explicit variable assignment with semicolon**
+```bash
+# ✅ Works: Explicit assignment with semicolon
+SESSION_ID="a019c84c-7b54-45cc-9eee-dd6a70dea1a3"; echo "$SESSION_ID"
+
+# ✅ Works: Use test command with && / ||
+test -f "$file" && echo "exists" || echo "not found"
+
+# ✅ Works: Chain commands with semicolons
+SESSION_ID="abc"; mkdir -p .claude && echo "value" > ".claude/agent-${SESSION_ID}.txt"
+```
+
+### ❌ WRONG Patterns (Will Cause Syntax Errors)
+
+```bash
+# ❌ BROKEN: Command substitution in assignment
+SESSION_ID=$(~/code/jat/scripts/get-current-session-id)
+# Error: SESSION_ID=\$ ( ... ) syntax error
+
+# ❌ BROKEN: Using $PPID (each Bash invocation has different PPID)
+SESSION_ID=$(cat /tmp/claude-session-${PPID}.txt)
+# Error: subprocess PPID ≠ Claude Code process PPID
+
+# ❌ BROKEN: if statement with &&
+SESSION_ID="abc" && if [[ -f "$file" ]]; then echo "yes"; fi
+# Error: syntax error near unexpected token 'if'
+```
+
+**Key Rules:**
+1. **Never use `$(...)` in variable assignments** - gets escaped
+2. **Never rely on `$PPID`** - each Bash call has different PPID
+3. **Prefer Read/Write tools** - no escaping issues
+4. **Use semicolons** for multi-statement commands
+5. **Use `test` or `[[ ]]` with `&&` / `||`** instead of if statements
+
+---
+
 ## Implementation Steps
 
 ### STEP 0: Parse Parameters
@@ -58,24 +111,30 @@ fi
 
 #### 1A: Check Current Agent Status
 
-**Use helper script to get session status:**
+**Use Read tool to get session status (CORRECT for Claude Code):**
 
 ```bash
-# Get session ID using helper script (finds most recent session file)
-# This works correctly even when bash commands run in subprocesses with different PPIDs
-SESSION_ID=$(~/code/jat/scripts/get-current-session-id 2>/dev/null | tr -d '\n')
+# Step 1: Get session ID using helper script (use separate Bash call)
+~/code/jat/scripts/get-current-session-id 2>/dev/null | tr -d '\n'
+# → Output: "a019c84c-7b54-45cc-9eee-dd6a70dea1a3"
 
-# Check if session agent file exists
-if [[ -n "$SESSION_ID" ]] && [[ -f ".claude/agent-${SESSION_ID}.txt" ]]; then
-  # Agent already registered for this session
-  AGENT_REGISTERED=true
-  CURRENT_AGENT=$(cat ".claude/agent-${SESSION_ID}.txt" 2>/dev/null | tr -d '\n')
-  echo "✅ Session agent detected: $CURRENT_AGENT"
-else
-  # No agent registered yet
-  AGENT_REGISTERED=false
-  echo "🆕 New session - no agent registered yet"
-fi
+# Step 2: Use Read tool to check if agent file exists
+Read(.claude/agent-{session-id-from-step-1}.txt)
+# → If exists: shows agent name
+# → If not exists: shows error "File does not exist"
+
+# Step 3: Based on result, either resume or create new agent
+```
+
+**Alternative: Use bash with explicit variable assignment:**
+
+```bash
+# ✅ CORRECT: Use semicolon with explicit variable assignment
+SESSION_ID="a019c84c-7b54-45cc-9eee-dd6a70dea1a3"; test -f ".claude/agent-${SESSION_ID}.txt" && cat ".claude/agent-${SESSION_ID}.txt" || echo "NO_AGENT"
+
+# ❌ WRONG: Command substitution gets escaped by Bash tool
+SESSION_ID=$(~/code/jat/scripts/get-current-session-id 2>/dev/null | tr -d '\n')
+# This causes: SESSION_ID=\$ ( ... ) syntax error
 ```
 
 **PPID-based session tracking:**
@@ -105,57 +164,45 @@ fi
 
 After determining AGENT_NAME (from any path above), check if already active:
 
+**Method 1: Use Read/Bash tools (RECOMMENDED):**
+
 ```bash
-# Get current session ID using helper script
-SESSION_ID=$(~/code/jat/scripts/get-current-session-id 2>/dev/null | tr -d '\n')
+# Step 1: Get session ID (separate Bash call)
+~/code/jat/scripts/get-current-session-id
+# → "a019c84c-7b54-45cc-9eee-dd6a70dea1a3"
 
-if [[ -n "$SESSION_ID" ]]; then
-  # Check if this agent is already active in another session
-  for session_file in .claude/agent-*.txt; do
-    [[ ! -f "$session_file" ]] && continue  # Skip if no files exist
+# Step 2: Check if agent already active in another session (use Bash tool)
+grep -l "AgentName" .claude/agent-*.txt 2>/dev/null || echo "Not active"
+# → If found: shows filename like ".claude/agent-9b2a2fac....txt"
+# → If not found: shows "Not active"
 
-    # Skip our own session file
-    if [[ "$session_file" == ".claude/agent-${SESSION_ID}.txt" ]]; then
-      continue
-    fi
+# Step 3: If agent IS active in another session, show error and exit
+# (Compare found session ID to current session ID from step 1)
 
-    # Check if another session has this agent
-    other_agent=$(cat "$session_file" 2>/dev/null | tr -d '\n')
-    if [[ "$other_agent" == "$AGENT_NAME" ]]; then
-      # Extract session ID from filename
-      other_session=$(basename "$session_file" | sed 's/agent-//;s/.txt//')
+# Step 4: Write agent name to session file (use Write tool)
+Write(.claude/agent-a019c84c-7b54-45cc-9eee-dd6a70dea1a3.txt, "AgentName")
+```
 
-      echo ""
-      echo "╔══════════════════════════════════════════════════════════════════════════╗"
-      echo "║                    ⚠️  AGENT ALREADY ACTIVE                              ║"
-      echo "╚══════════════════════════════════════════════════════════════════════════╝"
-      echo ""
-      echo "❌ Error: Agent '$AGENT_NAME' is already active in another terminal"
-      echo ""
-      echo "📍 Active in session: ${other_session:0:8}..."
-      echo "📁 Session file: $session_file"
-      echo ""
-      echo "💡 Options:"
-      echo "   1. Close the other terminal/session"
-      echo "   2. Choose a different agent name"
-      echo "   3. Delete the session file: rm \"$session_file\""
-      echo ""
-      exit 1
-    fi
-  done
-fi
+**Method 2: Use bash with explicit variables (ALTERNATIVE):**
 
-# Update session file (PPID-based session tracking)
-if [[ -n "$SESSION_ID" ]]; then
-  mkdir -p .claude
-  echo "$AGENT_NAME" > ".claude/agent-${SESSION_ID}.txt"
-  echo "✓ Session file updated: .claude/agent-${SESSION_ID}.txt"
-else
-  echo "⚠️  Warning: Could not detect session ID (statusline may not show agent)"
-fi
+```bash
+# ✅ CORRECT: Run helper script first, then use result
+~/code/jat/scripts/get-current-session-id | tr -d '\n'
+# → Get session ID output
 
-# Export env var (FALLBACK - for bash scripts)
-export AGENT_NAME="$AGENT_NAME"
+# Then in separate Bash call with explicit assignment:
+SESSION_ID="a019c84c-7b54-45cc-9eee-dd6a70dea1a3"; grep -l "AgentName" .claude/agent-*.txt | grep -v "agent-${SESSION_ID}.txt" && echo "ALREADY_ACTIVE" || echo "OK"
+
+# Then write with explicit variable:
+SESSION_ID="a019c84c-7b54-45cc-9eee-dd6a70dea1a3"; mkdir -p .claude && echo "AgentName" > ".claude/agent-${SESSION_ID}.txt"
+```
+
+**❌ WRONG: Don't use command substitution in variable assignment:**
+
+```bash
+# This gets escaped by Bash tool and causes syntax errors:
+SESSION_ID=$(~/code/jat/scripts/get-current-session-id)
+# Error: SESSION_ID=\$ ( ... ) syntax error
 ```
 
 **If AGENT_REGISTERED == true:**
@@ -260,55 +307,35 @@ fi
 
 After registering the agent (or when no agents exist and creating new), ALWAYS check if agent is already active:
 
+**Use Read/Bash/Write tools (RECOMMENDED):**
+
 ```bash
-# Get session ID using helper script
-SESSION_ID=$(~/code/jat/scripts/get-current-session-id 2>/dev/null | tr -d '\n')
+# Step 1: Get session ID (separate Bash call)
+~/code/jat/scripts/get-current-session-id
+# → "a019c84c-7b54-45cc-9eee-dd6a70dea1a3"
 
-if [[ -n "$SESSION_ID" ]]; then
-  # Check if this agent is already active in another session
-  for session_file in .claude/agent-*.txt; do
-    [[ ! -f "$session_file" ]] && continue  # Skip if no files exist
+# Step 2: Check if agent already active (use Bash tool)
+grep -l "YourAgentName" .claude/agent-*.txt 2>/dev/null
+# → If found: ".claude/agent-9b2a2fac-61d7-4333-97da-230d64d19f04.txt"
+# → If not found: no output
 
-    # Skip our own session file
-    if [[ "$session_file" == ".claude/agent-${SESSION_ID}.txt" ]]; then
-      continue
-    fi
+# Step 3: Compare found session to current session
+# If different: Show error and exit
+# If same or not found: Continue
 
-    # Check if another session has this agent
-    other_agent=$(cat "$session_file" 2>/dev/null | tr -d '\n')
-    if [[ "$other_agent" == "$AGENT_NAME" ]]; then
-      # Extract session ID from filename
-      other_session=$(basename "$session_file" | sed 's/agent-//;s/.txt//')
+# Step 4: Write agent name using Write tool
+Write(.claude/agent-a019c84c-7b54-45cc-9eee-dd6a70dea1a3.txt, "YourAgentName")
+# → Creates/updates the session file
+```
 
-      echo ""
-      echo "╔══════════════════════════════════════════════════════════════════════════╗"
-      echo "║                    ⚠️  AGENT ALREADY ACTIVE                              ║"
-      echo "╚══════════════════════════════════════════════════════════════════════════╝"
-      echo ""
-      echo "❌ Error: Agent '$AGENT_NAME' is already active in another terminal"
-      echo ""
-      echo "📍 Active in session: ${other_session:0:8}..."
-      echo "📁 Session file: $session_file"
-      echo ""
-      echo "💡 Options:"
-      echo "   1. Close the other terminal/session"
-      echo "   2. Choose a different agent name"
-      echo "   3. Delete the session file: rm \"$session_file\""
-      echo ""
-      exit 1
-    fi
-  done
+**Alternative: Use bash with explicit variables:**
 
-  # Write agent name to session-specific file (PRIMARY - statusline reads this)
-  mkdir -p .claude
-  echo "$AGENT_NAME" > ".claude/agent-${SESSION_ID}.txt"
-  echo "✓ Session file updated: .claude/agent-${SESSION_ID}.txt"
-else
-  echo "⚠️  Warning: Could not detect session ID (statusline may not show agent)"
-fi
+```bash
+# ✅ CORRECT: First get session ID
+~/code/jat/scripts/get-current-session-id | tr -d '\n'
 
-# Export env var (FALLBACK - for bash scripts)
-export AGENT_NAME="$AGENT_NAME"
+# Then use explicit variable in separate call:
+SESSION_ID="a019c84c-7b54-45cc-9eee-dd6a70dea1a3"; grep -l "YourAgentName" .claude/agent-*.txt | grep -v "agent-${SESSION_ID}.txt" && echo "ERROR: Already active" || (mkdir -p .claude && echo "YourAgentName" > ".claude/agent-${SESSION_ID}.txt" && echo "✓ Registered")
 ```
 
 **Why Session Files Matter:**
@@ -616,27 +643,38 @@ When `TASK_MODE=bulk` is detected:
 
 **CRITICAL Implementation Detail:**
 
-Always use the **helper script** for session file handling:
+Always use **Read/Write tools** or **explicit bash variables** for session file handling:
 
 ```bash
-✅ CORRECT (using helper script):
+✅ CORRECT Method 1 (RECOMMENDED): Use Read/Write tools
+# Step 1: Get session ID
+~/code/jat/scripts/get-current-session-id
+# → Output: "a019c84c-7b54-45cc-9eee-dd6a70dea1a3"
+
+# Step 2: Use Write tool with the session ID from step 1
+Write(.claude/agent-a019c84c-7b54-45cc-9eee-dd6a70dea1a3.txt, "AgentName")
+
+✅ CORRECT Method 2 (ALTERNATIVE): Use bash with explicit variable
+# First get session ID:
+~/code/jat/scripts/get-current-session-id | tr -d '\n'
+
+# Then in SEPARATE bash call with explicit assignment:
+SESSION_ID="a019c84c-7b54-45cc-9eee-dd6a70dea1a3"; mkdir -p .claude && echo "AgentName" > ".claude/agent-${SESSION_ID}.txt"
+
+❌ WRONG: Command substitution in variable assignment
+# This gets escaped by Bash tool and causes syntax errors:
 SESSION_ID=$(~/code/jat/scripts/get-current-session-id 2>/dev/null | tr -d '\n')
-if [[ -n "$SESSION_ID" ]]; then
-  echo "$AGENT_NAME" > ".claude/agent-${SESSION_ID}.txt"
-fi
+# Error: SESSION_ID=\$ ( ... ) syntax error
 
-❌ WRONG - Using $PPID directly:
-# Don't use $PPID in bash commands - each Bash tool invocation runs in a
-# NEW subprocess with a DIFFERENT PPID!
+❌ WRONG: Using $PPID directly
+# Each Bash tool invocation runs in a NEW subprocess with DIFFERENT PPID!
 SESSION_ID=$(cat /tmp/claude-session-${PPID}.txt | tr -d '\n')  # BROKEN
-
-❌ WRONG - Using Read/Write tools:
-# Can't use Read tool with ${PPID} - it's a bash variable!
-# Read(/tmp/claude-session-${PPID}.txt) won't work
 ```
 
-**Why helper script approach works:**
-- Finds the most recently modified session file (by timestamp)
+**Why this approach works:**
+- Read/Write tools work directly (no bash escaping issues)
+- Explicit bash variables avoid command substitution escaping
+- Helper script finds most recently modified session file (by timestamp)
 - Works even when bash commands run in subprocesses with different PPIDs
 - Each Bash tool invocation gets a new PPID, so can't rely on $PPID
 - Statusline updates the session file on every render, so newest = active

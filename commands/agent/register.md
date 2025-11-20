@@ -21,13 +21,48 @@ Follow these steps in order:
    - If resuming: Run `am-register --name AgentName --program claude-code --model sonnet-4.5`
    - If creating new: Run `am-register --program claude-code --model sonnet-4.5` (auto-generates name)
 
-3.5. **CRITICAL:** Update session file for statusline (session-aware persistence):
+3.5. **CRITICAL:** Check for duplicate active agents and update session file:
    ```bash
    # Get session ID
    SESSION_ID=$(cat /tmp/claude-session-${PPID}.txt 2>/dev/null | tr -d '\n')
 
-   # Write to session file (PRIMARY - statusline reads this)
+   # BLOCK if agent is already active in another session
    if [[ -n "$SESSION_ID" ]]; then
+     # Check if this agent is already active in another session
+     for session_file in .claude/agent-*.txt; do
+       [[ ! -f "$session_file" ]] && continue  # Skip if no files exist
+
+       # Skip our own session file
+       if [[ "$session_file" == ".claude/agent-${SESSION_ID}.txt" ]]; then
+         continue
+       fi
+
+       # Check if another session has this agent
+       other_agent=$(cat "$session_file" 2>/dev/null | tr -d '\n')
+       if [[ "$other_agent" == "$AGENT_NAME" ]]; then
+         # Extract session ID from filename
+         other_session=$(basename "$session_file" | sed 's/agent-//;s/.txt//')
+
+         echo ""
+         echo "╔══════════════════════════════════════════════════════════════════════════╗"
+         echo "║                    ⚠️  AGENT ALREADY ACTIVE                              ║"
+         echo "╚══════════════════════════════════════════════════════════════════════════╝"
+         echo ""
+         echo "❌ Error: Agent '$AGENT_NAME' is already active in another terminal"
+         echo ""
+         echo "📍 Active in session: ${other_session:0:8}..."
+         echo "📁 Session file: $session_file"
+         echo ""
+         echo "💡 Options:"
+         echo "   1. Close the other terminal/session"
+         echo "   2. Choose a different agent name"
+         echo "   3. Delete the session file: rm \"$session_file\""
+         echo ""
+         exit 1
+       fi
+     done
+
+     # Write to session file (PRIMARY - statusline reads this)
      mkdir -p .claude
      echo "$AGENT_NAME" > ".claude/agent-${SESSION_ID}.txt"
      echo "✓ Session file updated: .claude/agent-${SESSION_ID}.txt"
@@ -41,7 +76,8 @@ Follow these steps in order:
    - Each Claude Code session has a unique `session_id`
    - Statusline reads from `.claude/agent-{session_id}.txt` (PRIMARY)
    - `export AGENT_NAME` doesn't work (statusline is separate process)
-   - This enables multiple concurrent agents in different terminals
+   - One agent per terminal: Blocks if agent already active elsewhere
+   - This enables multiple concurrent agents in different terminals (each with unique name)
 
 4. Review inbox and acknowledge messages:
    - Run: `am-inbox AgentName --unread`
