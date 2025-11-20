@@ -24,8 +24,9 @@ export async function DELETE({ params }) {
 		}
 
 		// Use am-delete-agent command with --force to skip confirmation
+		// Use --all-projects to delete from all projects (prevents disambiguation errors)
 		// Use full path since Node doesn't inherit ~/.local/bin in PATH
-		const command = `${process.env.HOME}/.local/bin/am-delete-agent "${agentName}" --force`;
+		const command = `${process.env.HOME}/.local/bin/am-delete-agent "${agentName}" --force --all-projects`;
 
 		try {
 			const { stdout, stderr } = await execAsync(command);

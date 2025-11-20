@@ -24,12 +24,13 @@ if [[ $# -eq 0 ]] || [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
     cat <<EOF
 am-delete-agent - Delete an agent from Agent Mail
 
-Usage: am-delete-agent AGENT_NAME [--force] [--project PATH]
+Usage: am-delete-agent AGENT_NAME [--force] [--project PATH | --all-projects]
 
 Arguments:
-  AGENT_NAME      Name of agent to delete
-  --force         Skip confirmation prompt
-  --project PATH  Project path (default: current directory or any project if agent is unique)
+  AGENT_NAME        Name of agent to delete
+  --force           Skip confirmation prompt
+  --project PATH    Project path (default: current directory or any project if agent is unique)
+  --all-projects    Delete agent from ALL projects (use when agent exists in multiple projects)
 
 Safety checks:
   - Warns if agent has active reservations
@@ -40,6 +41,7 @@ Examples:
   am-delete-agent OldAgent
   am-delete-agent OldAgent --force
   am-delete-agent OldAgent --force --project ~/code/myproject
+  am-delete-agent OldAgent --force --all-projects              # Delete from ALL projects
 
 Exit codes:
   0 = Agent deleted successfully
@@ -59,6 +61,7 @@ fi
 AGENT_NAME="${1:-}"
 FORCE=false
 PROJECT_PATH=""
+ALL_PROJECTS=false
 
 shift || true
 while [[ $# -gt 0 ]]; do
@@ -70,6 +73,10 @@ while [[ $# -gt 0 ]]; do
         --project)
             PROJECT_PATH="${2:-}"
             shift 2
+            ;;
+        --all-projects)
+            ALL_PROJECTS=true
+            shift
             ;;
         *)
             shift
@@ -90,8 +97,35 @@ if [[ ! -f "$DB_PATH" ]]; then
     exit 1
 fi
 
-# Determine project path and find agent
-if [[ -n "$PROJECT_PATH" ]]; then
+# Determine if we're deleting from all projects or a specific project
+if [[ "$ALL_PROJECTS" == true ]]; then
+    # Delete from all projects
+    echo "Finding all instances of agent '$AGENT_NAME'..." >&2
+
+    # Get all agent IDs for this name across all projects
+    AGENT_IDS=$(sqlite3 "$DB_PATH" \
+        "SELECT id FROM agents WHERE name = '$AGENT_NAME';" 2>/dev/null || echo "")
+
+    if [[ -z "$AGENT_IDS" ]]; then
+        echo "Error: Agent '$AGENT_NAME' not found in any project" >&2
+        exit 1
+    fi
+
+    AGENT_COUNT=$(echo "$AGENT_IDS" | wc -l)
+    echo "Found $AGENT_COUNT instance(s) of '$AGENT_NAME'" >&2
+
+    # Get project paths for display
+    PROJECT_PATHS=$(sqlite3 "$DB_PATH" \
+        "SELECT p.human_key FROM agents a JOIN projects p ON a.project_id = p.id WHERE a.name = '$AGENT_NAME';")
+
+    echo "Projects:" >&2
+    echo "$PROJECT_PATHS" | while read -r path; do
+        echo "  - $path" >&2
+    done
+
+    # Will handle deletion of all instances below
+
+elif [[ -n "$PROJECT_PATH" ]]; then
     # Project specified explicitly
     PROJECT_ID=$(sqlite3 "$DB_PATH" \
         "SELECT id FROM projects WHERE human_key = '$PROJECT_PATH' LIMIT 1;" 2>/dev/null || echo "")
@@ -100,6 +134,19 @@ if [[ -n "$PROJECT_PATH" ]]; then
         echo "Error: Project '$PROJECT_PATH' not registered in Agent Mail" >&2
         exit 1
     fi
+
+    # Get agent ID for this project
+    AGENT_ID=$(sqlite3 "$DB_PATH" \
+        "SELECT id FROM agents WHERE name = '$AGENT_NAME' AND project_id = $PROJECT_ID LIMIT 1;")
+
+    if [[ -z "$AGENT_ID" ]]; then
+        echo "Error: Agent '$AGENT_NAME' not found in project '$PROJECT_PATH'" >&2
+        exit 1
+    fi
+
+    AGENT_IDS="$AGENT_ID"
+    AGENT_COUNT=1
+
 else
     # No project specified - find agent by name across all projects
     AGENT_COUNT=$(sqlite3 "$DB_PATH" \
@@ -110,7 +157,7 @@ else
         exit 1
     elif [[ "$AGENT_COUNT" -gt 1 ]]; then
         echo "Error: Agent '$AGENT_NAME' found in multiple projects" >&2
-        echo "Please specify --project PATH to disambiguate" >&2
+        echo "Please specify --project PATH or --all-projects" >&2
         echo "" >&2
         echo "Projects with this agent:" >&2
         sqlite3 "$DB_PATH" \
@@ -126,24 +173,18 @@ else
         "SELECT project_id FROM agents WHERE name = '$AGENT_NAME' LIMIT 1;")
     PROJECT_PATH=$(sqlite3 "$DB_PATH" \
         "SELECT human_key FROM projects WHERE id = $PROJECT_ID LIMIT 1;")
+    AGENT_ID=$(sqlite3 "$DB_PATH" \
+        "SELECT id FROM agents WHERE name = '$AGENT_NAME' AND project_id = $PROJECT_ID LIMIT 1;")
+    AGENT_IDS="$AGENT_ID"
 fi
 
-# Get agent ID
-AGENT_ID=$(sqlite3 "$DB_PATH" \
-    "SELECT id FROM agents WHERE name = '$AGENT_NAME' AND project_id = $PROJECT_ID LIMIT 1;")
-
-if [[ -z "$AGENT_ID" ]]; then
-    echo "Error: Agent '$AGENT_NAME' not found" >&2
-    exit 1
-fi
-
-# Safety checks
+# Safety checks for all agent instances
 echo "Checking agent dependencies..." >&2
 
-# Check for active reservations
+# Check for active reservations across all instances
 ACTIVE_RESERVATIONS=$(sqlite3 "$DB_PATH" \
     "SELECT COUNT(*) FROM file_reservations
-     WHERE agent_id = $AGENT_ID
+     WHERE agent_id IN ($(echo "$AGENT_IDS" | tr '\n' ',' | sed 's/,$//' ))
      AND released_ts IS NULL
      AND datetime(expires_ts) > datetime('now');" || echo "0")
 
@@ -152,9 +193,9 @@ if [[ "$ACTIVE_RESERVATIONS" -gt 0 ]]; then
     echo "   These will be released on deletion" >&2
 fi
 
-# Check for messages
+# Check for messages across all instances
 MESSAGE_COUNT=$(sqlite3 "$DB_PATH" \
-    "SELECT COUNT(*) FROM messages WHERE sender_id = $AGENT_ID;" || echo "0")
+    "SELECT COUNT(*) FROM messages WHERE sender_id IN ($(echo "$AGENT_IDS" | tr '\n' ',' | sed 's/,$//' ));" || echo "0")
 
 if [[ "$MESSAGE_COUNT" -gt 0 ]]; then
     echo "⚠️  Warning: Agent has sent $MESSAGE_COUNT message(s)" >&2
@@ -164,8 +205,15 @@ fi
 # Confirmation prompt (unless --force)
 if [[ "$FORCE" != true ]]; then
     echo ""
-    echo "Delete agent '$AGENT_NAME'?"
-    echo "  Project: $PROJECT_PATH"
+    if [[ "$ALL_PROJECTS" == true ]]; then
+        echo "Delete agent '$AGENT_NAME' from ALL $AGENT_COUNT project(s)?"
+        echo "$PROJECT_PATHS" | while read -r path; do
+            echo "  - $path"
+        done
+    elif [[ -n "$PROJECT_PATH" ]]; then
+        echo "Delete agent '$AGENT_NAME'?"
+        echo "  Project: $PROJECT_PATH"
+    fi
     echo "  Reservations: $ACTIVE_RESERVATIONS active"
     echo "  Messages: $MESSAGE_COUNT sent"
     echo ""
@@ -177,25 +225,31 @@ if [[ "$FORCE" != true ]]; then
     fi
 fi
 
-# Delete agent (messages and reservations are handled by FK constraints or preserved)
+# Delete agent instances (messages and reservations are handled by FK constraints or preserved)
+AGENT_IDS_SQL=$(echo "$AGENT_IDS" | tr '\n' ',' | sed 's/,$//')
+
 sqlite3 "$DB_PATH" <<SQL
 BEGIN TRANSACTION;
 
--- Release all active reservations
+-- Release all active reservations for these agent instances
 UPDATE file_reservations
 SET released_ts = datetime('now')
-WHERE agent_id = $AGENT_ID
+WHERE agent_id IN ($AGENT_IDS_SQL)
 AND released_ts IS NULL;
 
--- Delete agent record
+-- Delete agent records
 -- Note: messages are preserved (sender_id becomes orphaned but queryable)
-DELETE FROM agents WHERE id = $AGENT_ID;
+DELETE FROM agents WHERE id IN ($AGENT_IDS_SQL);
 
 COMMIT;
 SQL
 
 if [[ $? -eq 0 ]]; then
-    echo "✓ Agent '$AGENT_NAME' deleted successfully"
+    if [[ "$AGENT_COUNT" -gt 1 ]]; then
+        echo "✓ Agent '$AGENT_NAME' deleted from $AGENT_COUNT project(s)"
+    else
+        echo "✓ Agent '$AGENT_NAME' deleted successfully"
+    fi
     [[ "$ACTIVE_RESERVATIONS" -gt 0 ]] && echo "  Released $ACTIVE_RESERVATIONS reservation(s)"
     [[ "$MESSAGE_COUNT" -gt 0 ]] && echo "  Preserved $MESSAGE_COUNT message(s)"
     exit 0
