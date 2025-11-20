@@ -1,4 +1,4 @@
-# Agent Orchestration View
+# Agents View
 
 ## Overview
 
@@ -87,11 +87,11 @@ These features are **intentionally incomplete** and will be built in dependent t
 ## File Structure
 
 ```
-src/routes/orchestration/
-├── +page.svelte                        # Main orchestration view
+src/routes/agents/
+├── +page.svelte                        # Main agents view
 └── README.md                           # This file
 
-src/lib/components/orchestration/
+src/lib/components/agents/
 ├── TaskQueue.svelte                    # Left sidebar: unassigned tasks
 ├── AgentGrid.svelte                    # Right panel: agent columns
 └── AgentCard.svelte                    # Individual agent display
@@ -139,10 +139,10 @@ src/lib/components/orchestration/
 
 ## Usage
 
-Navigate to `/orchestration` in the dashboard:
+Navigate to `/agents` in the dashboard:
 
 ```
-http://localhost:5174/orchestration
+http://localhost:5174/agents
 ```
 
 **Current State**: Empty state view (no agents, no tasks) until backend API is implemented.
