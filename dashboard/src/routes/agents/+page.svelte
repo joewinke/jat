@@ -4,17 +4,64 @@
 	import AgentGrid from '$lib/components/agents/AgentGrid.svelte';
 	import SystemCapacityBar from '$lib/components/agents/SystemCapacityBar.svelte';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
+	import ProjectSelector from '$lib/components/ProjectSelector.svelte';
+	import {
+		getProjectsFromTasks,
+		getTaskCountByProject
+	} from '$lib/utils/projectUtils';
 
 	let tasks = $state([]);
 	let agents = $state([]);
 	let reservations = $state([]);
 	let unassignedTasks = $state([]);
 	let taskStats = $state(null);
+	let selectedProject = $state('All Projects');
+
+	// Extract unique projects from tasks
+	const projects = $derived(getProjectsFromTasks(tasks));
+
+	// Get task count per project
+	const taskCounts = $derived(getTaskCountByProject(tasks));
+
+	// Handle project selection change
+	function handleProjectChange(project: string) {
+		selectedProject = project;
+
+		// Update URL parameter
+		const url = new URL(window.location.href);
+		if (project === 'All Projects') {
+			// Remove project param for "All Projects"
+			url.searchParams.delete('project');
+		} else {
+			url.searchParams.set('project', project);
+		}
+		window.history.replaceState({}, '', url.toString());
+
+		// Refetch data with new project filter
+		fetchData();
+	}
+
+	// Sync selectedProject from URL params on mount
+	$effect(() => {
+		const params = new URLSearchParams(window.location.search);
+		const projectParam = params.get('project');
+		if (projectParam && projectParam !== 'All Projects') {
+			selectedProject = projectParam;
+		} else {
+			selectedProject = 'All Projects';
+		}
+	});
 
 	// Fetch agent data from unified API
 	async function fetchData() {
 		try {
-			const response = await fetch('/api/agents?full=true');
+			// Build URL with project filter
+			let url = '/api/agents?full=true';
+			if (selectedProject && selectedProject !== 'All Projects') {
+				url += `&project=${encodeURIComponent(selectedProject)}`;
+			}
+
+			const response = await fetch(url);
 			const data = await response.json();
 
 			if (data.error) {
