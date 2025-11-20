@@ -4,7 +4,7 @@
 # Multi-line status display for agent orchestration workflows
 #
 # Line 1: Agent Name | [Priority] Task ID - Task Title [Indicators]
-# Line 2: ⎇ Git Branch | 💬 Last Prompt | 💭 Context Remaining
+# Line 2: ▪▪▪▪▪▪▫▫▫▫ Context | ⎇ /folder/branch | 💬 Last Prompt
 #
 # Features:
 #   Agent Status (Line 1):
@@ -17,19 +17,19 @@
 #     7. Task progress percentage if available (N%)
 #
 #   Context & Git (Line 2):
-#     8. Git branch display (⎇ branch-name)
-#     9. Last user prompt from transcript (truncated to 80 chars)
-#    10. Context remaining percentage (color-coded: >50% green, >25% yellow, <25% red)
+#     8. Context remaining as battery bar (color-coded: >50% green, >25% yellow, <25% red)
+#     9. Git branch display with folder (⎇ /folder-name/branch-name)
+#    10. Last user prompt from transcript (truncated to 200 chars)
 #
 # IMPORTANT: Each session must explicitly set AGENT_NAME via /register.
 # New sessions will show "no agent registered" until /register is run.
 #
 # Example output:
 #   FreeMarsh | [P1] jomarchy-agent-tools-4p0 - Demo: Frontend... [🔒2 📬1 ⏱45m]
-#   ⎇ master | 💬 yes implement top 3 | 💭 67%
+#   ▪▪▪▪▪▪▫▫▫▫ | ⎇ /jat/master | 💬 yes implement top 3
 #
 #   jat | no agent registered (new session, run /register)
-#   ⎇ master | 💭 95%
+#   ▪▪▪▪▪▪▪▪▪▫ | ⎇ /chimaro/main
 #
 
 # ANSI color codes
@@ -96,11 +96,15 @@ elif [[ -n "$AGENT_NAME" ]]; then
     agent_name="$AGENT_NAME"
 fi
 
-# Get git branch if in a git repo
+# Get git branch if in a git repo, prepend with folder name
 git_branch=""
 if [[ -n "$cwd" ]] && [[ -d "$cwd/.git" ]]; then
     cd "$cwd" 2>/dev/null || true
-    git_branch=$(git branch --show-current 2>/dev/null || echo "")
+    branch=$(git branch --show-current 2>/dev/null || echo "")
+    if [[ -n "$branch" ]]; then
+        folder_name=$(basename "$cwd")
+        git_branch="/${folder_name}/${branch}"
+    fi
 fi
 
 # Get last user prompt from transcript
@@ -118,31 +122,62 @@ if [[ -n "$transcript_path" ]] && [[ -f "$transcript_path" ]]; then
                    empty
                end' 2>/dev/null | \
         grep -v "^$" | head -1)
-    # Truncate to 80 characters
-    if [[ -n "$last_prompt" ]] && [[ ${#last_prompt} -gt 80 ]]; then
-        last_prompt="${last_prompt:0:77}..."
+    # Truncate to 200 characters
+    if [[ -n "$last_prompt" ]] && [[ ${#last_prompt} -gt 200 ]]; then
+        last_prompt="${last_prompt:0:197}..."
     fi
 fi
 
 # Calculate context remaining percentage
 context_remaining=""
+context_percent=0
 if [[ $context_used -gt 0 ]] && [[ $context_limit -gt 0 ]]; then
     context_percent=$((100 - (context_used * 100 / context_limit)))
     context_remaining="${context_percent}%"
 fi
 
+# Generate battery/progress bar representation (10 segments, each = 10%)
+# Filled: ▪  Empty: ▫
+generate_battery_bar() {
+    local percent=$1
+    local filled=$((percent / 10))
+    local empty=$((10 - filled))
+    local bar=""
+
+    # Add filled segments
+    for ((i=0; i<filled; i++)); do
+        bar="${bar}▪"
+    done
+
+    # Add empty segments
+    for ((i=0; i<empty; i++)); do
+        bar="${bar}▫"
+    done
+
+    echo "$bar"
+}
+
 # If no agent name, show "not registered" status with git branch and context
 if [[ -z "$agent_name" ]]; then
     base_status="${GRAY}jat${RESET} ${GRAY}|${RESET} ${CYAN}no agent registered${RESET}"
 
-    # Build second line with git branch and context
+    # Build second line with context battery and git branch
     second_line=""
-    if [[ -n "$git_branch" ]]; then
-        second_line="${second_line}${MAGENTA}⎇${RESET} ${git_branch}"
-    fi
     if [[ -n "$context_remaining" ]]; then
+        # Generate battery bar with color based on percentage
+        if [[ $context_percent -gt 50 ]]; then
+            context_color="${GREEN}"
+        elif [[ $context_percent -gt 25 ]]; then
+            context_color="${YELLOW}"
+        else
+            context_color="${RED}"
+        fi
+        battery_bar=$(generate_battery_bar $context_percent)
+        second_line="${second_line}${context_color}${battery_bar}${RESET}"
+    fi
+    if [[ -n "$git_branch" ]]; then
         [[ -n "$second_line" ]] && second_line="${second_line} ${GRAY}|${RESET} "
-        second_line="${second_line}${CYAN}💭${RESET} ${context_remaining}"
+        second_line="${second_line}${MAGENTA}⎇${RESET} ${git_branch}"
     fi
 
     if [[ -n "$second_line" ]]; then
@@ -306,24 +341,11 @@ else
     status_line="${GRAY}jat${RESET}"
 fi
 
-# Build second line with git branch, last prompt, and context remaining
+# Build second line with context battery, git branch, and last prompt
 second_line=""
 
-# Add git branch
-if [[ -n "$git_branch" ]]; then
-    second_line="${second_line}${MAGENTA}⎇${RESET} ${git_branch}"
-fi
-
-# Add last user prompt
-if [[ -n "$last_prompt" ]]; then
-    [[ -n "$second_line" ]] && second_line="${second_line} ${GRAY}|${RESET} "
-    second_line="${second_line}${YELLOW}💬${RESET} ${last_prompt}"
-fi
-
-# Add context remaining
+# Add context remaining with battery bar FIRST
 if [[ -n "$context_remaining" ]]; then
-    [[ -n "$second_line" ]] && second_line="${second_line} ${GRAY}|${RESET} "
-
     # Color code based on remaining context
     if [[ $context_percent -gt 50 ]]; then
         context_color="${GREEN}"
@@ -333,7 +355,20 @@ if [[ -n "$context_remaining" ]]; then
         context_color="${RED}"
     fi
 
-    second_line="${second_line}${CYAN}💭${RESET} ${context_color}${context_remaining}${RESET}"
+    battery_bar=$(generate_battery_bar $context_percent)
+    second_line="${second_line}${context_color}${battery_bar}${RESET}"
+fi
+
+# Add git branch
+if [[ -n "$git_branch" ]]; then
+    [[ -n "$second_line" ]] && second_line="${second_line} ${GRAY}|${RESET} "
+    second_line="${second_line}${MAGENTA}⎇${RESET} ${git_branch}"
+fi
+
+# Add last user prompt
+if [[ -n "$last_prompt" ]]; then
+    [[ -n "$second_line" ]] && second_line="${second_line} ${GRAY}|${RESET} "
+    second_line="${second_line}${YELLOW}💬${RESET} ${last_prompt}"
 fi
 
 # Output status line(s)
