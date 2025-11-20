@@ -371,11 +371,8 @@ echo "📬 Announced start in Agent Mail"
 ### STEP 7: Update Beads Task Status
 
 ```bash
-# Mark task as in-progress
-bd update "$TASK_ID" --status in-progress --assignee "$AGENT_NAME"
-
-# Add start note
-bd add "$TASK_ID" "Started work (agent: $AGENT_NAME)"
+# Mark task as in_progress (note: underscore not hyphen!)
+bd update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME"
 
 echo "✅ Updated Beads task status"
 ```
