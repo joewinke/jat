@@ -18,6 +18,7 @@ IMPORTANCE="normal"
 ACK_REQUIRED=0
 PROJECT="$PROJECT_KEY"
 JSON_OUTPUT=false
+ACTIVE_WINDOW=60  # Default: 60 minutes for @active mention
 
 show_help() {
     cat <<EOF
@@ -37,6 +38,7 @@ Options:
   --thread ID         Thread identifier (e.g., bd-123) (optional)
   --importance LEVEL  Message importance: normal | high | urgent (default: normal)
   --ack               Require acknowledgment (default: false)
+  --active-window N   Minutes for @active window (default: 60)
   --project PATH      Project path (default: current directory)
   --json              Output as JSON
   --help, -h          Show this help
@@ -46,12 +48,14 @@ Examples:
   am-send "[bd-123] Start work" "Beginning task..." --from Builder --to Team --thread bd-123 --ack
   am-send "Update" "Progress report" --from Agent1 --to Agent2,Agent3 --cc Manager --importance high
   am-send "Announcement" "Server maintenance tonight" --from Admin --to @active --importance high
+  am-send "Quick sync" "Need immediate help" --from Dev --to @active --active-window 15 --importance urgent
   am-send "Critical Alert" "System down" --from Monitor --to @all --importance urgent
   am-send "Project Update" "Sprint completed" --from Lead --to @project:jat --importance high
 
 Mentions:
-  @active             Expands to all agents active in last 60 minutes
-                      Shows: "✓ Expanded @active → N agent(s): Agent1,Agent2..."
+  @active             Expands to all agents active in last 60 minutes (default)
+                      Use --active-window N to customize time window
+                      Shows: "✓ Expanded @active → N agent(s) (last X min): Agent1,Agent2..."
   @recent             Expands to all agents active in last 24 hours
                       Shows: "✓ Expanded @recent → N agent(s): Agent1,Agent2..."
   @all                Expands to ALL registered agents (even offline)
@@ -106,6 +110,10 @@ while [[ $# -gt 0 ]]; do
             JSON_OUTPUT=true
             shift
             ;;
+        --active-window)
+            ACTIVE_WINDOW="$2"
+            shift 2
+            ;;
         --help|-h)
             show_help
             exit 0
@@ -133,6 +141,11 @@ if [[ -z "$TO_AGENTS" ]]; then
     am_error "--to agents is required"
 fi
 
+# Validate active-window (must be positive integer)
+if ! [[ "$ACTIVE_WINDOW" =~ ^[0-9]+$ ]] || [[ "$ACTIVE_WINDOW" -le 0 ]]; then
+    am_error "--active-window must be a positive integer (minutes)"
+fi
+
 # Expand @all mention to ALL registered agents (even offline)
 if [[ "$TO_AGENTS" == *"@all"* ]]; then
     ALL_AGENTS=$(sqlite3 "$AGENT_MAIL_DB" "SELECT name FROM agents ORDER BY name;" | tr '\n' ',' | sed 's/,$//')
@@ -155,12 +168,12 @@ if [[ "$TO_AGENTS" == *"@all"* ]]; then
     fi
 fi
 
-# Expand @active mention to agents active in last 60 minutes
+# Expand @active mention to agents active in last N minutes (configurable via --active-window)
 if [[ "$TO_AGENTS" == *"@active"* ]]; then
-    ACTIVE_AGENTS=$(sqlite3 "$AGENT_MAIL_DB" "SELECT name FROM agents WHERE datetime(last_active_ts) > datetime('now', '-60 minutes') ORDER BY name;" | tr '\n' ',' | sed 's/,$//')
+    ACTIVE_AGENTS=$(sqlite3 "$AGENT_MAIL_DB" "SELECT name FROM agents WHERE datetime(last_active_ts) > datetime('now', '-$ACTIVE_WINDOW minutes') ORDER BY name;" | tr '\n' ',' | sed 's/,$//')
 
     if [[ -z "$ACTIVE_AGENTS" ]]; then
-        am_error "No active agents found (last 60 minutes). Cannot expand @active mention."
+        am_error "No active agents found (last $ACTIVE_WINDOW minutes). Cannot expand @active mention."
     fi
 
     # Replace @active with expanded list
@@ -170,7 +183,7 @@ if [[ "$TO_AGENTS" == *"@active"* ]]; then
     ACTIVE_COUNT=$(echo "$ACTIVE_AGENTS" | tr ',' '\n' | wc -l)
 
     # Show expansion
-    echo "✓ Expanded @active → $ACTIVE_COUNT agent(s): $ACTIVE_AGENTS"
+    echo "✓ Expanded @active → $ACTIVE_COUNT agent(s) (last $ACTIVE_WINDOW min): $ACTIVE_AGENTS"
 fi
 
 # Expand @recent mention to agents active in last 24 hours
