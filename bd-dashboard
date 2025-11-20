@@ -10,8 +10,14 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Get the directory where this script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Get the directory where this script is located (resolve symlinks)
+SCRIPT_SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SCRIPT_SOURCE" ]; do
+    SCRIPT_DIR="$( cd -P "$( dirname "$SCRIPT_SOURCE" )" && pwd )"
+    SCRIPT_SOURCE="$(readlink "$SCRIPT_SOURCE")"
+    [[ $SCRIPT_SOURCE != /* ]] && SCRIPT_SOURCE="$SCRIPT_DIR/$SCRIPT_SOURCE"
+done
+SCRIPT_DIR="$( cd -P "$( dirname "$SCRIPT_SOURCE" )" && pwd )"
 DASHBOARD_DIR="$SCRIPT_DIR/dashboard"
 
 echo -e "${GREEN}🚀 Beads Task Dashboard Launcher${NC}"
