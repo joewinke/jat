@@ -32,7 +32,7 @@ Arguments:
 Options:
   --from AGENT        Sending agent name (required)
   --to AGENTS         Comma-separated list of recipient agents (required)
-                      Special mentions: @active (expands to agents active in last 60 min)
+                      Special mentions: @active, @all
   --cc AGENTS         Comma-separated list of CC recipients (optional)
   --thread ID         Thread identifier (e.g., bd-123) (optional)
   --importance LEVEL  Message importance: normal | high | urgent (default: normal)
@@ -46,10 +46,13 @@ Examples:
   am-send "[bd-123] Start work" "Beginning task..." --from Builder --to Team --thread bd-123 --ack
   am-send "Update" "Progress report" --from Agent1 --to Agent2,Agent3 --cc Manager --importance high
   am-send "Announcement" "Server maintenance tonight" --from Admin --to @active --importance high
+  am-send "Critical Alert" "System down" --from Monitor --to @all --importance urgent
 
 Mentions:
   @active             Expands to all agents active in last 60 minutes
                       Shows: "✓ Expanded @active → N agent(s): Agent1,Agent2..."
+  @all                Expands to ALL registered agents (even offline)
+                      Shows: "✓ Broadcasting to all agents: N"
 
 Database: $AGENT_MAIL_DB
 EOF
@@ -122,6 +125,28 @@ fi
 
 if [[ -z "$TO_AGENTS" ]]; then
     am_error "--to agents is required"
+fi
+
+# Expand @all mention to ALL registered agents (even offline)
+if [[ "$TO_AGENTS" == *"@all"* ]]; then
+    ALL_AGENTS=$(sqlite3 "$AGENT_MAIL_DB" "SELECT name FROM agents ORDER BY name;" | tr '\n' ',' | sed 's/,$//')
+
+    if [[ -z "$ALL_AGENTS" ]]; then
+        am_error "No agents found in database. Cannot expand @all mention."
+    fi
+
+    # Replace @all with expanded list
+    TO_AGENTS="${TO_AGENTS//@all/$ALL_AGENTS}"
+
+    # Count agents for display
+    ALL_COUNT=$(echo "$ALL_AGENTS" | tr ',' '\n' | wc -l)
+
+    # Show expansion with warning if large number
+    if [[ "$ALL_COUNT" -gt 50 ]]; then
+        echo "⚠️  Broadcasting to all agents: $ALL_COUNT (large broadcast!)"
+    else
+        echo "✓ Broadcasting to all agents: $ALL_COUNT"
+    fi
 fi
 
 # Expand @active mention to agents active in last 60 minutes
