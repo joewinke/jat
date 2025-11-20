@@ -88,11 +88,12 @@ if [[ -z "$TYPE" ]]; then
     exit 1
 fi
 
-# Get session ID (prefer parameter, fallback to file)
+# Get session ID (prefer parameter, fallback to PPID-based file)
 if [[ -n "$SESSION_ID_PARAM" ]]; then
     SESSION_ID="$SESSION_ID_PARAM"
 else
-    SESSION_ID=$(cat .claude/current-session-id.txt 2>/dev/null | tr -d '\n' || echo "")
+    # Use PPID-based session file (process-isolated)
+    SESSION_ID=$(cat /tmp/claude-session-${PPID}.txt 2>/dev/null | tr -d '\n' || echo "")
 fi
 
 if [[ -z "$SESSION_ID" ]]; then

@@ -129,6 +129,30 @@ export function getTaskCountByProject(tasks: Task[]): Map<string, number> {
 }
 
 /**
+ * Get filesystem path for a project based on task ID
+ *
+ * @param taskId - Task ID with project prefix (e.g., "chimaro-abc", "jat-xyz")
+ * @returns Absolute path to project directory, or null if project cannot be determined
+ *
+ * @example
+ * getProjectPath("chimaro-abc") // "/home/user/code/chimaro"
+ * getProjectPath("jat-xyz") // "/home/user/code/jat"
+ * getProjectPath("invalid") // null
+ */
+export function getProjectPath(taskId: string): string | null {
+  const projectName = getProjectFromTaskId(taskId);
+
+  if (!projectName) {
+    return null;
+  }
+
+  // Map project name to filesystem path
+  // All projects are in ~/code/{project-name}
+  const homeDir = process.env.HOME || '~';
+  return `${homeDir}/code/${projectName}`;
+}
+
+/**
  * Filter tasks by project name
  *
  * @param tasks - Array of task objects

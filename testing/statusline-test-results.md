@@ -5,6 +5,9 @@
 **Date:** 2025-11-20
 **Feature Under Test:** Session-aware statusline with 5 indicators
 
+**⚠️  HISTORICAL NOTE:** This document describes the original implementation using `.claude/current-session-id.txt`.
+**Current implementation uses PPID-based tracking** (`/tmp/claude-session-${PPID}.txt`) for race-free multi-terminal support. See `jat-6jx` for PPID migration details.
+
 ## Test Objective
 
 Validate the complete statusline feature including session-aware agent tracking, priority badges, file lock indicators, message counts, time remaining, and task progress display.
@@ -352,7 +355,9 @@ jat | no agent registered
 
 **Feature:** Store session_id for slash commands to access
 
-**Implementation Review (.claude/statusline.sh lines 43-46):**
+**Implementation Review (HISTORICAL - OLD APPROACH):**
+
+**OLD approach (.claude/statusline.sh - no longer used):**
 ```bash
 # Store session_id for slash commands to access
 # (Commands don't get JSON input, so we persist it for them)
@@ -361,16 +366,26 @@ if [[ -n "$session_id" ]] && [[ -n "$cwd" ]]; then
 fi
 ```
 
+**NEW approach (PPID-based - current):**
+```bash
+# Store session_id using PPID for process isolation
+# This prevents race conditions between multiple Claude Code terminals
+if [[ -n "$session_id" ]]; then
+    echo "$session_id" > "/tmp/claude-session-${PPID}.txt" 2>/dev/null
+fi
+```
+
 **Purpose:**
 - Statusline receives session_id from Claude Code via JSON
 - Slash commands don't get this JSON input
-- Persist to file so commands can access current session
+- Persist to PPID-based file so commands can access current session
 
-**File Location:** `.claude/current-session-id.txt`
+**File Location:** `/tmp/claude-session-${PPID}.txt` (process-isolated, race-free)
 
 **Analysis:**
 - ✅ Enables slash commands to read session_id
 - ✅ Written on every statusline refresh
+- ✅ PPID ensures each terminal gets unique file (no race conditions)
 - ✅ Silent failure (2>/dev/null) if write fails
 - ✅ Critical for session-aware agent identity
 

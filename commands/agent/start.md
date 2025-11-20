@@ -14,11 +14,36 @@ Get to work! Unified smart command that handles registration, task selection, co
 
 **What this command does:**
 1. **Smart Registration:** Categorizes existing agents by state (working/active/idle/offline) and offers resumption
-2. **Duplicate Prevention:** Always checks if agent name exists before registering (resumes instead of creating duplicates)
-3. **Session Persistence:** Updates `.claude/agent-{session_id}.txt` for statusline
-4. **Task Selection:** From parameter, conversation context, or priority
-5. **Conflict Detection:** File locks, git changes, dependencies
-6. **Actually Starts Work:** Reserves files, sends Agent Mail, updates Beads
+2. **Global Agent Lookup:** Agents are globally unique - uses simple `am-agents` lookup (no project filtering needed)
+3. **Duplicate Prevention:** Always checks if agent name exists before registering (resumes instead of creating duplicates)
+4. **Session Persistence:** Updates `.claude/agent-{session_id}.txt` for statusline
+5. **Task Selection:** From parameter, conversation context, or priority
+6. **Conflict Detection:** File locks, git changes, dependencies
+7. **Actually Starts Work:** Reserves files, sends Agent Mail, updates Beads
+
+**IMPORTANT: Agents are globally unique across all projects.** You cannot have two agents with the same name, even in different projects. This simplifies registration - we just check `am-agents` globally without any project filtering.
+
+**Why global uniqueness matters:**
+- ✅ Simple registration: Just check if name exists with `am-agents | grep`
+- ✅ No project disambiguation: No need to ask "which project's agent?"
+- ✅ Cleaner logic: One agent name = one agent (period)
+- ✅ Easier coordination: Agents can work across multiple projects with same identity
+- ❌ No duplicates: Cannot create "AgentA" in project X and "AgentA" in project Y
+
+**Example:**
+```bash
+# This is all you need - simple global check
+if am-agents | grep -q "^  ${AGENT_NAME}$"; then
+  echo "Agent exists globally"
+else
+  am-register --name "$AGENT_NAME" ...
+fi
+
+# No project filtering needed!
+# No disambiguation needed!
+```
+
+**Note:** `am-agents` output may show "Agents in project" as display text, but agents are globally unique. The same agent name cannot exist in multiple projects.
 
 ---
 
@@ -155,13 +180,14 @@ SESSION_ID=$(~/code/jat/scripts/get-current-session-id 2>/dev/null | tr -d '\n')
 
 **If PARAM_TYPE == "agent-name":**
 ```bash
-# User explicitly requested an agent - check if it exists first
+# User explicitly requested an agent - check if it exists GLOBALLY
+# (Agents are globally unique - no project filtering needed)
 AGENT_NAME="$REQUESTED_AGENT"
 
-# Check if agent already exists in Agent Mail DB
+# Simple global lookup using am-agents
 if am-agents | grep -q "^  ${AGENT_NAME}$"; then
   echo "✅ Resuming existing agent: $AGENT_NAME"
-  # Don't re-register - agent already exists
+  # Don't re-register - agent already exists globally
 else
   echo "✨ Creating new agent: $AGENT_NAME"
   am-register --name "$AGENT_NAME" --program claude-code --model sonnet-4.5
@@ -222,11 +248,11 @@ echo "✅ Resuming as $AGENT_NAME (session agent)"
 
 **If AGENT_REGISTERED == false AND no agent requested:**
 ```bash
-# List existing agents (simple, fast)
+# List existing agents globally (simple, fast - no project filtering)
 am-agents
-# Output shows all registered agents
+# Output shows all registered agents across all projects
 
-# Count agents
+# Count agents globally
 AGENT_COUNT=$(am-agents --json | jq 'length')
 
 if [[ "$AGENT_COUNT" -gt 0 ]]; then
@@ -685,15 +711,17 @@ SESSION_ID=$(cat /tmp/claude-session-${PPID}.txt | tr -d '\n')  # BROKEN
 
 ## Notes
 
+- **Global agent uniqueness:** Agent names are globally unique across all projects - no duplicates allowed
+- **Simple global lookup:** Uses `am-agents | grep` for simple, fast agent detection (no project filtering)
 - **PPID-based isolation:** Uses `/tmp/claude-session-${PPID}.txt` for race-free multi-terminal support
 - **One agent per terminal:** Blocks registration if agent is already active in another session
 - **Session-first:** Always writes to session file before env var
 - **Helper script approach:** Use `get-current-session-id` script (finds most recent session file by timestamp)
-- **Resume existing agents:** Always checks if agent name exists before registering to prevent duplicates
+- **Resume existing agents:** Always checks if agent name exists globally before registering to prevent duplicates
 - **Smart defaults:** Auto-detects recent agents, picks best task
 - **Conflict-aware:** Checks locks, git status, dependencies
 - **Actually starts:** Not just recommendations - reserves files and updates status
-- **Multi-agent ready:** Supports concurrent agents in different terminals (each with unique name)
+- **Multi-agent ready:** Supports concurrent agents in different terminals (each with unique name globally)
 - **Quick mode:** Skip safety checks when you need speed
 
 ---

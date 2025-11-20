@@ -10,11 +10,12 @@ set -euo pipefail
 # Read tool info from stdin
 TOOL_INFO=$(cat)
 
-# Extract session ID from hook data (NOT from shared file!)
+# Extract session ID from hook data (preferred - always available in hooks)
 SESSION_ID=$(echo "$TOOL_INFO" | jq -r '.session_id // ""' 2>/dev/null || echo "")
 if [[ -z "$SESSION_ID" ]]; then
-    # Fallback to shared file if session_id not in JSON (shouldn't happen)
-    SESSION_ID=$(cat .claude/current-session-id.txt 2>/dev/null | tr -d '\n' || echo "")
+    # Fallback to PPID-based file if session_id not in JSON (shouldn't happen with hooks)
+    # Note: PPID here is the hook's parent, which may not be correct
+    SESSION_ID=$(cat /tmp/claude-session-${PPID}.txt 2>/dev/null | tr -d '\n' || echo "")
 fi
 
 if [[ -z "$SESSION_ID" ]]; then

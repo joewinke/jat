@@ -1071,7 +1071,7 @@ FreeMarsh | [P1] jat-4p0 - Demo: Frontend... [🔒2 📬1 ⏱45m]
 
 **Files created:**
 - `.claude/agent-{session_id}.txt` - Session-specific agent name
-- `.claude/current-session-id.txt` - Latest session ID (for slash commands)
+- `/tmp/claude-session-${PPID}.txt` - PPID-based session ID (process-isolated, race-free)
 
 **Setup:** Automatically configured by installer. Works immediately after `/register`.
 

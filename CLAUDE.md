@@ -93,10 +93,12 @@ All three sessions work independently with their own agent identities.
 ### Files Created
 
 - `.claude/agent-{session_id}.txt` - Your agent name for this session
-- `.claude/current-session-id.txt` - Latest session ID (written by statusline)
+- `/tmp/claude-session-${PPID}.txt` - PPID-based session ID (process-isolated)
 - `.claude/statusline.sh` - The statusline script
 
 **These files are session-specific** - don't commit `agent-*.txt` files to git (they're per-developer session).
+
+**PPID-based tracking:** Uses parent process ID for race-free multi-terminal support.
 
 ### Troubleshooting Statusline Issues
 
@@ -113,8 +115,8 @@ am-register --name ShortTundra ...
 
 **✅ This DOES work - write to your session file:**
 ```bash
-# Get your session ID
-session_id=$(cat .claude/current-session-id.txt 2>/dev/null | tr -d '\n')
+# Get your session ID (PPID-based)
+session_id=$(cat /tmp/claude-session-${PPID}.txt 2>/dev/null | tr -d '\n')
 
 # Write your agent name to YOUR session's file
 echo "ShortTundra" > ".claude/agent-${session_id}.txt"
@@ -122,7 +124,7 @@ echo "ShortTundra" > ".claude/agent-${session_id}.txt"
 
 **One-liner fix:**
 ```bash
-session_id=$(cat .claude/current-session-id.txt | tr -d '\n') && echo "ShortTundra" > ".claude/agent-${session_id}.txt"
+session_id=$(cat /tmp/claude-session-${PPID}.txt | tr -d '\n') && echo "ShortTundra" > ".claude/agent-${session_id}.txt"
 ```
 
 Your statusline updates immediately - no restart needed!
@@ -136,14 +138,17 @@ Your statusline updates immediately - no restart needed!
 
 **Checking which session you're in:**
 ```bash
-# See your session ID
-cat .claude/current-session-id.txt
+# See your session ID (PPID-based)
+cat /tmp/claude-session-${PPID}.txt
 
-# See all session files
+# See your PPID (parent process ID)
+echo $PPID
+
+# See all session files for this project
 ls -la .claude/agent-*.txt
 
 # See your session's agent name
-session_id=$(cat .claude/current-session-id.txt | tr -d '\n') && cat ".claude/agent-${session_id}.txt"
+session_id=$(cat /tmp/claude-session-${PPID}.txt | tr -d '\n') && cat ".claude/agent-${session_id}.txt"
 ```
 
 ## Agent Workflow Commands
@@ -620,8 +625,8 @@ npm run dev
 
 ### Statusline not updating
 ```bash
-# Write to your session file
-session_id=$(cat .claude/current-session-id.txt | tr -d '\n') && echo "YourAgentName" > ".claude/agent-${session_id}.txt"
+# Write to your session file (PPID-based)
+session_id=$(cat /tmp/claude-session-${PPID}.txt | tr -d '\n') && echo "YourAgentName" > ".claude/agent-${session_id}.txt"
 ```
 
 ## References

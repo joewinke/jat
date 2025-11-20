@@ -8,6 +8,8 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { getProjectPath } from '$lib/utils/projectUtils.js';
+import { getTasks } from '$lib/server/beads.js';
 
 const execAsync = promisify(exec);
 
@@ -23,16 +25,13 @@ export async function POST({ params }) {
 			}, { status: 400 });
 		}
 
-		// Get list of tasks assigned to this agent
-		const listCommand = `bd list --json`;
-
+		// Get all tasks from all projects and filter to this agent's open tasks
 		try {
-			const { stdout } = await execAsync(listCommand, { cwd: process.env.HOME + '/code/jat' });
-			const allTasks = JSON.parse(stdout.trim());
+			const allTasks = getTasks({ status: 'open' });
 
-			// Filter to open tasks assigned to this agent
+			// Filter to tasks assigned to this agent
 			const agentTasks = allTasks.filter(
-				(t) => t.assignee === agentName && t.status === 'open'
+				(t) => t.assignee === agentName
 			);
 
 			if (agentTasks.length === 0) {
@@ -45,10 +44,14 @@ export async function POST({ params }) {
 				});
 			}
 
-			// Unassign each task
-			const updatePromises = agentTasks.map((task) =>
-				execAsync(`bd update ${task.id} --assignee ""`, { cwd: process.env.HOME + '/code/jat' })
-			);
+			// Unassign each task using its project-specific path
+			const updatePromises = agentTasks.map((task) => {
+				const projectPath = getProjectPath(task.id);
+				if (!projectPath) {
+					throw new Error(`Could not determine project path for task ${task.id}`);
+				}
+				return execAsync(`bd update ${task.id} --assignee ""`, { cwd: projectPath });
+			});
 
 			await Promise.all(updatePromises);
 

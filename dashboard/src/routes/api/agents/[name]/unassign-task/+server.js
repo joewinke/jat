@@ -8,6 +8,7 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { getProjectPath } from '$lib/utils/projectUtils.js';
 
 const execAsync = promisify(exec);
 
@@ -24,11 +25,21 @@ export async function POST({ params, request }) {
 			}, { status: 400 });
 		}
 
+		// Determine project path from task ID
+		const projectPath = getProjectPath(taskId);
+		if (!projectPath) {
+			return json({
+				error: 'Invalid task ID',
+				message: `Could not determine project for task ${taskId}`,
+				taskId
+			}, { status: 400 });
+		}
+
 		// Verify task exists and is assigned to this agent
 		const showCommand = `bd show ${taskId} --json`;
 
 		try {
-			const { stdout } = await execAsync(showCommand, { cwd: process.env.HOME + '/code/jat' });
+			const { stdout } = await execAsync(showCommand, { cwd: projectPath });
 			const task = JSON.parse(stdout.trim());
 
 			if (task.assignee !== agentName) {
@@ -42,7 +53,7 @@ export async function POST({ params, request }) {
 
 			// Unassign the task
 			const updateCommand = `bd update ${taskId} --assignee ""`;
-			await execAsync(updateCommand, { cwd: process.env.HOME + '/code/jat' });
+			await execAsync(updateCommand, { cwd: projectPath });
 
 			return json({
 				success: true,

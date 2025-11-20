@@ -17,7 +17,7 @@ mcp_agent_mail/
 # Claude Code session-specific files (per-developer, don't commit)
 .claude/agent-*.txt
 .claude/agent-*-activity.jsonl
-.claude/current-session-id.txt
+# Note: Session IDs now in /tmp/claude-session-${PPID}.txt (PPID-based, not in repo)
 
 # Beads task database (per-developer, run 'bd init' after cloning)
 .beads/
