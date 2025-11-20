@@ -10,13 +10,16 @@ set -euo pipefail
 # Read tool info from stdin
 TOOL_INFO=$(cat)
 
-# Parse tool name and parameters
-TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.name // "Unknown"' 2>/dev/null || echo "Unknown")
+# Debug: Save raw input to see what we're receiving
+echo "$TOOL_INFO" >> /tmp/claude-hook-debug.log
+
+# Parse tool name and parameters (correct JSON paths)
+TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "Unknown"' 2>/dev/null || echo "Unknown")
 
 # Build preview based on tool type
 case "$TOOL_NAME" in
     Read)
-        FILE_PATH=$(echo "$TOOL_INFO" | jq -r '.parameters.file_path // ""' 2>/dev/null || echo "")
+        FILE_PATH=$(echo "$TOOL_INFO" | jq -r '.tool_input.file_path // ""' 2>/dev/null || echo "")
         PREVIEW="Reading $(basename "$FILE_PATH")"
         ~/code/jat/scripts/log-agent-activity \
             --type tool \
@@ -26,7 +29,7 @@ case "$TOOL_NAME" in
             --content "Read file: $FILE_PATH"
         ;;
     Write)
-        FILE_PATH=$(echo "$TOOL_INFO" | jq -r '.parameters.file_path // ""' 2>/dev/null || echo "")
+        FILE_PATH=$(echo "$TOOL_INFO" | jq -r '.tool_input.file_path // ""' 2>/dev/null || echo "")
         PREVIEW="Writing $(basename "$FILE_PATH")"
         ~/code/jat/scripts/log-agent-activity \
             --type tool \
@@ -36,7 +39,7 @@ case "$TOOL_NAME" in
             --content "Write file: $FILE_PATH"
         ;;
     Edit)
-        FILE_PATH=$(echo "$TOOL_INFO" | jq -r '.parameters.file_path // ""' 2>/dev/null || echo "")
+        FILE_PATH=$(echo "$TOOL_INFO" | jq -r '.tool_input.file_path // ""' 2>/dev/null || echo "")
         PREVIEW="Editing $(basename "$FILE_PATH")"
         ~/code/jat/scripts/log-agent-activity \
             --type tool \
@@ -46,7 +49,7 @@ case "$TOOL_NAME" in
             --content "Edit file: $FILE_PATH"
         ;;
     Bash)
-        COMMAND=$(echo "$TOOL_INFO" | jq -r '.parameters.command // ""' 2>/dev/null || echo "")
+        COMMAND=$(echo "$TOOL_INFO" | jq -r '.tool_input.command // ""' 2>/dev/null || echo "")
         # Truncate long commands
         SHORT_CMD=$(echo "$COMMAND" | head -c 50)
         [[ ${#COMMAND} -gt 50 ]] && SHORT_CMD="${SHORT_CMD}..."
@@ -58,7 +61,7 @@ case "$TOOL_NAME" in
             --content "Bash: $COMMAND"
         ;;
     Grep|Glob)
-        PATTERN=$(echo "$TOOL_INFO" | jq -r '.parameters.pattern // ""' 2>/dev/null || echo "")
+        PATTERN=$(echo "$TOOL_INFO" | jq -r '.tool_input.pattern // ""' 2>/dev/null || echo "")
         PREVIEW="Searching: $PATTERN"
         ~/code/jat/scripts/log-agent-activity \
             --type tool \

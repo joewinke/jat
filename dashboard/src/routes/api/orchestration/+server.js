@@ -31,7 +31,8 @@ async function getAgentActivities(limit = 10) {
 	const activitiesByAgent = {};
 
 	try {
-		const claudeDir = '.claude';
+		// Activity files are in project root, not dashboard directory
+		const claudeDir = '../.claude';
 		if (!existsSync(claudeDir)) {
 			return activitiesByAgent;
 		}
