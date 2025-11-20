@@ -105,8 +105,8 @@ if [[ -n "$ALREADY_ACKED" ]] && [[ "$ALREADY_ACKED" != "" ]]; then
     exit 0
 fi
 
-# Acknowledge the message
-sqlite3 "$AGENT_MAIL_DB" "UPDATE message_recipients SET ack_ts = datetime('now') WHERE message_id = $MESSAGE_ID AND agent_id = $AGENT_ID;"
+# Acknowledge the message (also marks as read since acknowledging implies reading)
+sqlite3 "$AGENT_MAIL_DB" "UPDATE message_recipients SET ack_ts = datetime('now'), read_ts = COALESCE(read_ts, datetime('now')) WHERE message_id = $MESSAGE_ID AND agent_id = $AGENT_ID;"
 
 # Fetch message details
 MESSAGE_INFO=$(sqlite3 -json "$AGENT_MAIL_DB" <<SQL
