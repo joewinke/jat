@@ -69,6 +69,26 @@ ORDER BY last_active_ts DESC;
 SQL
 )
 
+# Add human-readable "last_active_ago" field (handles UTC→local conversion)
+ENHANCED_AGENTS="[]"
+AGENT_COUNT=$(echo "$AGENTS" | jq '. | length')
+
+for ((i=0; i<AGENT_COUNT; i++)); do
+    AGENT=$(echo "$AGENTS" | jq -r ".[$i]")
+    LAST_ACTIVE_TS=$(echo "$AGENT" | jq -r '.last_active_ts // ""')
+
+    if [[ -n "$LAST_ACTIVE_TS" ]]; then
+        LAST_ACTIVE_AGO=$(~/code/jat/scripts/time-ago "$LAST_ACTIVE_TS" 2>/dev/null || echo "unknown")
+    else
+        LAST_ACTIVE_AGO="never"
+    fi
+
+    ENHANCED_AGENT=$(echo "$AGENT" | jq --arg ago "$LAST_ACTIVE_AGO" '. + {last_active_ago: $ago}')
+    ENHANCED_AGENTS=$(echo "$ENHANCED_AGENTS" | jq ". += [$ENHANCED_AGENT]")
+done
+
+AGENTS="$ENHANCED_AGENTS"
+
 # Display agents
 if [[ "$JSON_OUTPUT" == "true" ]]; then
     echo "$AGENTS" | am_format_json
@@ -88,6 +108,6 @@ else
     Program: \(.program)
     Model: \(.model)
     Task: \(.task_description // "(none)")
-    Last active: \(.last_active_ts)
+    Last active: \(.last_active_ago) (\(.last_active_ts))
 "'
 fi

@@ -264,8 +264,8 @@ if [[ "$AGENT_COUNT" -gt 0 ]]; then
   echo "╚══════════════════════════════════════════════════════════════════════════╝"
   echo ""
 
-  # Get agent list
-  am-agents --json | jq -r '.[] | "  • \(.name) (last active: \(.last_active_ts // "never"))"'
+  # Get agent list with human-readable time (uses UTC→local conversion)
+  am-agents --json | jq -r '.[] | "  • \(.name) (last active: \(.last_active_ago // "never"))"'
   echo ""
 
   # Check which agents are ACTIVELY working (session file modified in last 10 minutes)
