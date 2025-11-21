@@ -61,7 +61,7 @@
 		showTooltip = true,
 		showGrid = false,
 		colorMode = 'usage',
-		staticColor = '#3b82f6',
+		staticColor = '#10b981',
 		showStyleToolbar = true,
 		defaultTimeRange = '24h',
 		defaultColorMode = 'usage'
@@ -88,6 +88,17 @@
 	let internalShowGrid = $state(false); // Internal grid toggle state (starts off, user can toggle)
 	let smoothCurves = $state(true); // Enable bezier curve smoothing
 	let internalColorMode = $state<'usage' | 'static'>(defaultColorMode); // Initialize from prop
+	let selectedPaletteColor = $state('#10b981'); // Default to green
+
+	// Color palette options
+	const colorPalette = [
+		{ name: 'Green', color: '#10b981' },
+		{ name: 'Blue', color: '#3b82f6' },
+		{ name: 'Orange', color: '#f59e0b' },
+		{ name: 'Red', color: '#ef4444' },
+		{ name: 'Purple', color: '#a855f7' },
+		{ name: 'Pink', color: '#ec4899' }
+	];
 
 	// ============================================================================
 	// Computed Values
@@ -207,10 +218,10 @@
 	/** Calculate color for a specific data point based on relative position in range */
 	function getColorForValue(tokens: number): string {
 		if (internalColorMode === 'static') {
-			return staticColor;
+			return selectedPaletteColor;
 		}
 
-		if (!filteredData || filteredData.length === 0) return '#3b82f6'; // Primary blue
+		if (!filteredData || filteredData.length === 0) return '#10b981'; // Default green
 
 		// Use relative thresholds based on actual data range
 		const allTokens = filteredData.map((d) => d.tokens);
@@ -230,7 +241,7 @@
 
 	/** Calculate line color based on average usage */
 	const lineColor = $derived.by(() => {
-		if (!filteredData || filteredData.length === 0) return '#3b82f6'; // Primary blue
+		if (!filteredData || filteredData.length === 0) return '#10b981'; // Default green
 		const avgTokens = filteredData.reduce((sum, d) => sum + d.tokens, 0) / filteredData.length;
 		return getColorForValue(avgTokens);
 	});
@@ -568,26 +579,42 @@
 									/>
 								</label>
 
-								<!-- Color Mode Toggle -->
-								<label class="label cursor-pointer py-1 justify-between">
-									<span class="label-text text-xs">Color mode</span>
-									<div class="flex items-center gap-1">
-										<button
-											class="btn btn-xs {internalColorMode === 'usage' ? 'btn-primary' : 'btn-ghost'}"
-											onclick={() => (internalColorMode = 'usage')}
-											title="Usage-based threshold colors"
-										>
-											Usage
-										</button>
-										<button
-											class="btn btn-xs {internalColorMode === 'static' ? 'btn-primary' : 'btn-ghost'}"
-											onclick={() => (internalColorMode = 'static')}
-											title="Single static color"
-										>
-											Static
-										</button>
+								<!-- Color Mode Section -->
+								<div class="space-y-2">
+									<div class="flex items-center justify-between">
+										<span class="label-text text-xs font-semibold">Color</span>
+										<div class="flex items-center gap-1">
+											<button
+												class="btn btn-xs {internalColorMode === 'usage' ? 'btn-primary' : 'btn-ghost'}"
+												onclick={() => (internalColorMode = 'usage')}
+												title="Usage-based percentile colors"
+											>
+												Usage
+											</button>
+											<button
+												class="btn btn-xs {internalColorMode === 'static' ? 'btn-primary' : 'btn-ghost'}"
+												onclick={() => (internalColorMode = 'static')}
+												title="Single color palette"
+											>
+												Palette
+											</button>
+										</div>
 									</div>
-								</label>
+
+									<!-- Color Palette (shown when in static mode) -->
+									{#if internalColorMode === 'static'}
+										<div class="flex items-center gap-1.5 flex-wrap" transition:slide={{ duration: 150 }}>
+											{#each colorPalette as paletteColor}
+												<button
+													class="w-7 h-7 rounded-full border-2 transition-all {selectedPaletteColor === paletteColor.color ? 'border-primary ring-2 ring-primary/30 scale-110' : 'border-base-300 hover:scale-105 hover:border-base-400'}"
+													style="background-color: {paletteColor.color};"
+													onclick={() => (selectedPaletteColor = paletteColor.color)}
+													title={paletteColor.name}
+												></button>
+											{/each}
+										</div>
+									{/if}
+								</div>
 							</div>
 						</div>
 			</div>
