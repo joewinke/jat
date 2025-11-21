@@ -1,6 +1,8 @@
 <script>
+	import { onMount } from 'svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 	import { getTokenColorClass, HIGH_USAGE_WARNING_THRESHOLD } from '$lib/config/tokenUsageConfig';
+	import Sparkline from '$lib/components/Sparkline.svelte';
 
 	let { agent, tasks = [], allTasks = [], reservations = [], onTaskAssign = () => {}, draggedTaskId = null } = $props();
 
@@ -35,6 +37,12 @@
 	let usageLoading = $state(false);
 	let usageError = $state(null);
 	let usageRetryCount = $state(0);
+
+	// Sparkline state management
+	let sparklineData = $state([]);
+	let sparklineLoading = $state(false);
+	let sparklineError = $state(null);
+	let sparklineInterval = null;
 
 	// Compute agent status using $derived
 	// States: live (< 1m, truly responsive) > working (1-10m with task) > active (recent activity) > idle (within 1h) > offline (>1h)
@@ -403,6 +411,46 @@
 		if (cost === 0) return '$0.00';
 		return '$' + cost.toFixed(2);
 	}
+
+	// Fetch sparkline data for this agent
+	async function fetchSparklineData() {
+		try {
+			sparklineLoading = true;
+			sparklineError = null;
+
+			const response = await fetch(`/api/agents/sparkline?range=24h&agent=${encodeURIComponent(agent.name)}`);
+
+			if (!response.ok) {
+				throw new Error(`Failed to fetch sparkline data: ${response.statusText}`);
+			}
+
+			const data = await response.json();
+			sparklineData = data.data || [];
+
+		} catch (error) {
+			console.error('Error fetching sparkline data:', error);
+			sparklineError = error.message;
+			sparklineData = [];
+		} finally {
+			sparklineLoading = false;
+		}
+	}
+
+	// Setup sparkline auto-refresh on mount
+	onMount(() => {
+		// Initial fetch
+		fetchSparklineData();
+
+		// Setup 30-second polling interval
+		sparklineInterval = setInterval(fetchSparklineData, 30000);
+
+		// Cleanup on unmount
+		return () => {
+			if (sparklineInterval) {
+				clearInterval(sparklineInterval);
+			}
+		};
+	});
 
 	// Handle right-click to show quick actions menu
 	function handleContextMenu(event) {
@@ -975,6 +1023,44 @@
 						{/if}
 					</div>
 				{/if}
+			{/if}
+		</div>
+
+		<!-- Token Usage Sparkline -->
+		<div class="mb-3">
+			<div class="text-xs font-medium text-base-content/70 mb-1">
+				<span>Usage Trend (24h):</span>
+			</div>
+
+			{#if sparklineLoading && sparklineData.length === 0}
+				<!-- Initial Loading State -->
+				<div class="bg-base-200 rounded p-2 flex items-center justify-center">
+					<div class="loading loading-spinner loading-xs text-primary"></div>
+					<span class="text-xs text-base-content/50 ml-2">Loading...</span>
+				</div>
+
+			{:else if sparklineError && sparklineData.length === 0}
+				<!-- Error State (only show if no data at all) -->
+				<div class="bg-base-200 rounded p-2 text-center">
+					<p class="text-xs text-base-content/50">Unable to load trend data</p>
+				</div>
+
+			{:else if sparklineData.length === 0}
+				<!-- No Data State -->
+				<div class="bg-base-200 rounded p-2 text-center">
+					<p class="text-xs text-base-content/50">No trend data available</p>
+				</div>
+
+			{:else}
+				<!-- Success State: Show Sparkline -->
+				<div class="bg-base-200 rounded p-2">
+					<Sparkline
+						data={sparklineData}
+						height={40}
+						showTooltip={true}
+						colorMode="usage"
+					/>
+				</div>
 			{/if}
 		</div>
 
