@@ -9,8 +9,11 @@
 	// State
 	let svgElement = $state(null);
 	let width = $state(1200);
-	let height = $state(600);
 	let margin = { top: 40, right: 150, bottom: 60, left: 200 };
+
+	// Dynamic height based on number of tasks (40px per task minimum)
+	const minRowHeight = 40;
+	let height = $state(600);
 
 	// Status color mapping (DaisyUI-compatible)
 	const statusColors = {
@@ -69,18 +72,25 @@
 		// Sort tasks by start date
 		tasksWithDates.sort((a, b) => a.startDate - b.startDate);
 
+		// Calculate dynamic height based on task count
+		const dynamicHeight = Math.max(
+			600, // Minimum height
+			tasksWithDates.length * minRowHeight + margin.top + margin.bottom
+		);
+		height = dynamicHeight;
+
 		// Create SVG
 		const svg = d3
 			.select(svgElement)
 			.attr('width', width)
-			.attr('height', height)
-			.attr('viewBox', `0 0 ${width} ${height}`)
+			.attr('height', dynamicHeight)
+			.attr('viewBox', `0 0 ${width} ${dynamicHeight}`)
 			.attr('class', 'bg-base-100');
 
 		const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
 		const innerWidth = width - margin.left - margin.right;
-		const innerHeight = height - margin.top - margin.bottom;
+		const innerHeight = dynamicHeight - margin.top - margin.bottom;
 
 		// X-axis: Date scale
 		const xExtent = d3.extent(
@@ -96,7 +106,7 @@
 			.scaleBand()
 			.domain(tasksWithDates.map(d => d.id))
 			.range([0, innerHeight])
-			.padding(0.2);
+			.padding(0.3);  // Increased padding for more spacing
 
 		// Add X-axis
 		g.append('g')
