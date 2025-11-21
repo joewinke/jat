@@ -83,8 +83,7 @@
 	// Handle task assignment via drag-and-drop
 	async function handleTaskAssign(taskId, agentName) {
 		try {
-			// TODO: Implement task assignment endpoint or use bd CLI directly
-			const response = await fetch('/api/agents?full=true', {
+			const response = await fetch('/api/agents', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
