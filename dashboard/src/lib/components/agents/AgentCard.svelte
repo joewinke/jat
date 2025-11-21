@@ -1,6 +1,4 @@
 <script>
-	import CapacityBar from '$lib/components/CapacityBar.svelte';
-	import { calculateAgentCapacity } from '$lib/utils/capacityCalculations';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 
 	let { agent, tasks = [], allTasks = [], reservations = [], onTaskAssign = () => {}, draggedTaskId = null } = $props();
@@ -139,12 +137,6 @@
 				(!r.released_ts) &&
 				new Date(r.expires_ts) > new Date()
 		);
-	});
-
-	// Compute enhanced capacity (hour-based estimation)
-	// Use allTasks for global capacity (not filtered by project)
-	const agentCapacity = $derived(() => {
-		return calculateAgentCapacity(agent, allTasks, 8);
 	});
 
 	// Format last activity time
@@ -900,18 +892,6 @@
 			</div>
 		</div>
 
-		<!-- Enhanced Capacity Indicator with Hour-based Estimates -->
-		<div class="mb-3">
-			<CapacityBar
-				usedHours={agentCapacity().usedHours}
-				availableHours={agentCapacity().availableHours}
-				percentage={agentCapacity().percentage}
-				status={agentCapacity().status}
-				tasksBreakdown={agentCapacity().tasksBreakdown}
-				showLabel={true}
-				size="md"
-			/>
-		</div>
 
 	</div>
 </div>
