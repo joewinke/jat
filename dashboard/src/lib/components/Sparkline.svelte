@@ -80,6 +80,7 @@
 	let tooltipY = $state(0);
 	let svgElement: SVGSVGElement;
 	let showControls = $state(false); // Hover-to-expand control panel
+	let hideControlsTimeout: ReturnType<typeof setTimeout> | null = null; // Delay before hiding controls
 	let customDateFrom = $state<string>(''); // Custom date range start (YYYY-MM-DD)
 	let customDateTo = $state<string>(''); // Custom date range end (YYYY-MM-DD)
 	let showCustomDatePicker = $state(false); // Show custom date inputs
@@ -386,8 +387,17 @@
 <div
 	class="sparkline-container"
 	style="width: {typeof width === 'number' ? width + 'px' : width};"
-	onmouseenter={() => showStyleToolbar && (showControls = true)}
-	onmouseleave={() => (showControls = false)}
+	onmouseenter={() => {
+		if (showStyleToolbar) {
+			if (hideControlsTimeout) clearTimeout(hideControlsTimeout);
+			showControls = true;
+		}
+	}}
+	onmouseleave={() => {
+		hideControlsTimeout = setTimeout(() => {
+			showControls = false;
+		}, 200);
+	}}
 	role="group"
 	aria-label="Interactive sparkline chart"
 >
@@ -396,8 +406,15 @@
 		<div
 			class="sparkline-controls-panel"
 			transition:slide={{ duration: 200 }}
-			onmouseenter={() => (showControls = true)}
-			onmouseleave={() => (showControls = false)}
+			onmouseenter={() => {
+				if (hideControlsTimeout) clearTimeout(hideControlsTimeout);
+				showControls = true;
+			}}
+			onmouseleave={() => {
+				hideControlsTimeout = setTimeout(() => {
+					showControls = false;
+				}, 200);
+			}}
 		>
 			<div class="p-2 bg-base-200 rounded-lg shadow-lg border border-base-300 space-y-3">
 				<!-- Chart Type Section -->
