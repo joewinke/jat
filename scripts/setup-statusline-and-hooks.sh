@@ -188,7 +188,8 @@ for repo_dir in "$CODE_DIR"/*; do
                                 {
                                     "type": "command",
                                     "command": "~/.claude/hooks/post-bash-agent-state-refresh.sh",
-                                    "statusMessage": "Checking agent state changes..."
+                                    "statusMessage": "Checking agent state changes...",
+                                    "streamStdinJson": true
                                 }
                             ]
                         }
@@ -221,7 +222,8 @@ for repo_dir in "$CODE_DIR"/*; do
           {
             "type": "command",
             "command": "~/.claude/hooks/post-bash-agent-state-refresh.sh",
-            "statusMessage": "Checking agent state changes..."
+            "statusMessage": "Checking agent state changes...",
+            "streamStdinJson": true
           }
         ]
       }
