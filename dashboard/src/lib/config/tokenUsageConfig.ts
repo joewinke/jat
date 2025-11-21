@@ -22,19 +22,19 @@ export const TOKEN_THRESHOLDS = {
 	 * Green zone: Normal usage
 	 * < 100K tokens/day (~$0.30/day, ~$9/month)
 	 */
-	low: 100_000,
+	low: 100_000_000,
 
 	/**
 	 * Yellow zone: Elevated usage, monitor
 	 * 100K-500K tokens/day (~$1.50/day, ~$45/month)
 	 */
-	medium: 500_000,
+	medium: 250_000_000,
 
 	/**
 	 * Orange zone: High usage, investigate
 	 * 500K-1M tokens/day (~$3/day, ~$90/month)
 	 */
-	high: 1_000_000
+	high: 500_000_000
 
 	/**
 	 * Red zone: Critical usage, take action
@@ -46,7 +46,7 @@ export const TOKEN_THRESHOLDS = {
  * Show warning badge when daily usage exceeds this threshold
  * Default: 1M tokens/day (red zone)
  */
-export const HIGH_USAGE_WARNING_THRESHOLD = 1_000_000;
+export const HIGH_USAGE_WARNING_THRESHOLD = TOKEN_THRESHOLDS.high;
 
 /**
  * Helper function to get color class based on token count and thresholds

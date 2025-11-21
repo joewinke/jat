@@ -4,7 +4,6 @@
 	import TaskList from '$lib/components/TaskList.svelte';
 	import DependencyGraph from '$lib/components/DependencyGraph.svelte';
 	import TaskDetailModal from '$lib/components/TaskDetailModal.svelte';
-	import ClaudeUsageBar from '$lib/components/ClaudeUsageBar.svelte';
 
 	let selectedPriority = $state('all');
 	let selectedStatus = $state('all');
@@ -102,11 +101,6 @@
 					bind:value={searchQuery}
 				/>
 			</div>
-		</div>
-
-		<!-- Claude Usage Widget (upper right) -->
-		<div class="absolute top-4 right-4">
-			<ClaudeUsageBar />
 		</div>
 	</div>
 

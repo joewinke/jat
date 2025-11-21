@@ -4,11 +4,11 @@
 	import TaskQueue from '$lib/components/agents/TaskQueue.svelte';
 	import AgentGrid from '$lib/components/agents/AgentGrid.svelte';
 	import Sparkline from '$lib/components/Sparkline.svelte';
+	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
 	import {
 		getProjectsFromTasks,
 		getTaskCountByProject
 	} from '$lib/utils/projectUtils';
-	import { formatTokens, formatCost, getUsageColor } from '$lib/utils/numberFormat';
 
 	let tasks = $state([]);
 	let allTasks = $state([]);  // Unfiltered tasks for project list calculation
@@ -19,71 +19,16 @@
 	let selectedProject = $state('All Projects');
 	let sparklineData = $state([]);
 
+	// Drawer state for TaskDetailDrawer
+	let drawerOpen = $state(false);
+	let selectedTaskId = $state(null);
+	let drawerMode = $state('view');
+
 	// Extract unique projects from ALL tasks (unfiltered)
 	const projects = $derived(getProjectsFromTasks(allTasks));
 
 	// Get task count per project from ALL tasks (only count 'open' tasks to match TaskQueue default)
 	const taskCounts = $derived(getTaskCountByProject(allTasks, 'open'));
-
-	// Calculate system-wide usage statistics
-	const systemStats = $derived(() => {
-		if (!agents || agents.length === 0) {
-			return {
-				tokensToday: 0,
-				costToday: 0,
-				tokensWeek: 0,
-				costWeek: 0,
-				activeAgents: 0
-			};
-		}
-
-		let tokensToday = 0;
-		let costToday = 0;
-		let tokensWeek = 0;
-		let costWeek = 0;
-		let activeAgents = 0;
-
-		agents.forEach(agent => {
-			// Count agents as active if they have reservations or in-progress tasks
-			if (agent.active) {
-				activeAgents++;
-			}
-
-			// Aggregate token usage (from usage field if available)
-			if (agent.usage) {
-				tokensToday += agent.usage.today?.total_tokens || 0;
-				costToday += agent.usage.today?.cost || 0;
-				tokensWeek += agent.usage.week?.total_tokens || 0;
-				costWeek += agent.usage.week?.cost || 0;
-			}
-		});
-
-		return {
-			tokensToday,
-			costToday,
-			tokensWeek,
-			costWeek,
-			activeAgents
-		};
-	});
-
-	// Calculate top consumers (top 3 agents by token usage today)
-	const topConsumers = $derived(() => {
-		if (!agents || agents.length === 0) {
-			return [];
-		}
-
-		// Filter agents with usage data, sort by tokens today, take top 3
-		return agents
-			.filter(agent => agent.usage && agent.usage.today?.total_tokens > 0)
-			.sort((a, b) => (b.usage?.today?.total_tokens || 0) - (a.usage?.today?.total_tokens || 0))
-			.slice(0, 3)
-			.map(agent => ({
-				name: agent.name,
-				tokens: agent.usage?.today?.total_tokens || 0,
-				cost: agent.usage?.today?.cost || 0
-			}));
-	});
 
 	// Handle project selection change
 	function handleProjectChange(project: string) {
@@ -190,6 +135,13 @@
 		}
 	}
 
+	// Handle task click from TaskQueue - open drawer
+	function handleTaskClick(taskId) {
+		selectedTaskId = taskId;
+		drawerMode = 'view';
+		drawerOpen = true;
+	}
+
 	// Auto-refresh data every 5 seconds using Svelte reactivity
 	$effect(() => {
 		const interval = setInterval(fetchData, 5000);
@@ -200,6 +152,14 @@
 	$effect(() => {
 		const interval = setInterval(fetchSparklineData, 30000);
 		return () => clearInterval(interval);
+	});
+
+	// Refetch data when drawer closes (to update any changes)
+	$effect(() => {
+		if (!drawerOpen && selectedTaskId) {
+			// Drawer just closed, refresh data
+			fetchData();
+		}
 	});
 
 	onMount(() => {
@@ -218,85 +178,36 @@
 				{agents}
 				{reservations}
 				{selectedProject}
+				ontaskclick={handleTaskClick}
 			/>
 		</div>
 
 		<!-- Right Panel: Agent Grid -->
 		<div class="flex-1 overflow-auto">
-			<!-- System-Wide Usage Summary -->
-			<div class="collapse collapse-arrow bg-base-100 border border-base-300 m-4">
-				<input type="checkbox" checked />
-				<div class="collapse-title text-lg font-semibold">
-					System Usage Overview
+			<!-- 24h Token Usage Trend -->
+			{#if sparklineData && sparklineData.length > 0}
+				<div class="m-4 p-4 bg-base-100 border border-base-300 rounded-lg">
+					<h3 class="text-sm font-semibold mb-3 text-base-content/70">
+						24-Hour Token Usage
+					</h3>
+					<Sparkline
+						data={sparklineData}
+						height={60}
+						colorMode="usage"
+						showTooltip={true}
+						showGrid={false}
+					/>
 				</div>
-				<div class="collapse-content">
-					<!-- Sparkline: 24h Token Usage Trend -->
-					{#if sparklineData && sparklineData.length > 0}
-						<div class="mb-4 p-4 bg-base-200 rounded-lg">
-							<h3 class="text-sm font-semibold mb-2 text-base-content/70">
-								24-Hour Token Usage
-							</h3>
-							<Sparkline
-								data={sparklineData}
-								height={60}
-								colorMode="usage"
-								showTooltip={true}
-								showGrid={false}
-							/>
-						</div>
-					{/if}
-
-					<!-- Two column layout: Stats on left, Top Agents on right -->
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<!-- Left: Concise System Stats -->
-						<div class="stats shadow bg-base-200">
-							<div class="stat">
-								<div class="stat-title">Tokens</div>
-								<div class="stat-value text-{getUsageColor(systemStats().tokensToday, 'today')}">
-									{formatTokens(systemStats().tokensToday)}
-								</div>
-							</div>
-
-							<div class="stat">
-								<div class="stat-title">Spend</div>
-								<div class="stat-value text-{getUsageColor(systemStats().tokensToday, 'today')}">
-									{formatCost(systemStats().costToday)}
-								</div>
-							</div>
-
-							<div class="stat">
-								<div class="stat-title">Agents</div>
-								<div class="stat-value text-primary">{systemStats().activeAgents}</div>
-							</div>
-						</div>
-
-						<!-- Right: Top Agents -->
-						<div class="card bg-base-200 shadow">
-							<div class="card-body">
-								<h3 class="card-title text-base">Top Agents</h3>
-								{#if topConsumers().length > 0}
-									<div class="space-y-1">
-										{#each topConsumers() as consumer, index}
-											<div class="flex justify-between items-center text-sm">
-												<span class="font-medium">
-													{index + 1}. {consumer.name}
-												</span>
-												<span class="text-{getUsageColor(consumer.tokens, 'today')}">
-													{formatTokens(consumer.tokens)} · {formatCost(consumer.cost)}
-												</span>
-											</div>
-										{/each}
-									</div>
-								{:else}
-									<p class="text-sm text-base-content/60">No usage data</p>
-								{/if}
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
+			{/if}
 
 			<AgentGrid {agents} {tasks} {allTasks} {reservations} onTaskAssign={handleTaskAssign} />
 		</div>
 	</div>
+
+	<!-- Task Detail Drawer -->
+	<TaskDetailDrawer
+		bind:taskId={selectedTaskId}
+		bind:mode={drawerMode}
+		bind:isOpen={drawerOpen}
+	/>
 </div>

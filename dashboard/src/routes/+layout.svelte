@@ -8,7 +8,6 @@
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import TaskCreationDrawer from '$lib/components/TaskCreationDrawer.svelte';
 	import Nav from '$lib/components/Nav.svelte';
-	import ClaudeUsageBar from '$lib/components/ClaudeUsageBar.svelte';
 	import { getProjectsFromTasks, getTaskCountByProject } from '$lib/utils/projectUtils';
 
 	let { children } = $props();
@@ -80,6 +79,3 @@
 />
 
 {@render children()}
-
-<!-- Claude Usage Bar (fixed bottom) -->
-<ClaudeUsageBar />

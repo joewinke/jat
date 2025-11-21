@@ -19,6 +19,7 @@
 
 	// Task data state
 	let task = $state(null);
+	let originalTask = $state(null); // Track original task to prevent infinite save loops
 	let loading = $state(false);
 	let error = $state(null);
 
@@ -101,6 +102,7 @@
 			}
 			const data = await response.json();
 			task = data.task;
+			originalTask = { ...data.task }; // Store original for comparison
 
 			// Populate form data for edit mode
 			formData = {
@@ -183,6 +185,7 @@
 
 				// Update task with server response
 				task = data.task;
+				originalTask = { ...data.task }; // Update original to match saved state
 				lastSaved = new Date();
 
 				// Show success toast
@@ -232,44 +235,45 @@
 	}
 
 	// Auto-save watchers for each field (only in edit mode)
+	// Compare against originalTask to prevent infinite loops
 	$effect(() => {
-		if (mode === 'edit' && task && formData.title !== task.title) {
+		if (mode === 'edit' && originalTask && formData.title !== originalTask.title) {
 			autoSave('title', formData.title);
 		}
 	});
 
 	$effect(() => {
-		if (mode === 'edit' && task && formData.description !== task.description) {
+		if (mode === 'edit' && originalTask && formData.description !== originalTask.description) {
 			autoSave('description', formData.description);
 		}
 	});
 
 	$effect(() => {
-		if (mode === 'edit' && task && formData.priority !== task.priority) {
+		if (mode === 'edit' && originalTask && formData.priority !== originalTask.priority) {
 			autoSave('priority', formData.priority);
 		}
 	});
 
 	$effect(() => {
-		if (mode === 'edit' && task && formData.type !== task.type) {
+		if (mode === 'edit' && originalTask && formData.type !== originalTask.type) {
 			autoSave('type', formData.type);
 		}
 	});
 
 	$effect(() => {
-		if (mode === 'edit' && task && formData.status !== task.status) {
+		if (mode === 'edit' && originalTask && formData.status !== originalTask.status) {
 			autoSave('status', formData.status);
 		}
 	});
 
 	$effect(() => {
-		if (mode === 'edit' && task && formData.project !== task.project) {
+		if (mode === 'edit' && originalTask && formData.project !== originalTask.project) {
 			autoSave('project', formData.project);
 		}
 	});
 
 	$effect(() => {
-		if (mode === 'edit' && task && formData.assignee !== task.assignee) {
+		if (mode === 'edit' && originalTask && formData.assignee !== originalTask.assignee) {
 			autoSave('assignee', formData.assignee);
 		}
 	});
@@ -287,6 +291,7 @@
 			// Reset to view mode on close
 			mode = 'view';
 			task = null;
+			originalTask = null;
 			error = null;
 			saveError = null;
 			toastMessage = null;

@@ -5,23 +5,42 @@
 	import DependencyIndicator from '$lib/components/DependencyIndicator.svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 
-	let { tasks = [], agents = [], reservations = [], selectedProject = 'All Projects' } = $props();
+	let { tasks = [], agents = [], reservations = [], selectedProject = 'All Projects', ontaskclick } = $props();
 
 	// Initialize filters from URL params (default to open tasks)
 	let searchQuery = $state('');
-	let priorityFilter = $state('all');
-	let statusFilter = $state('open'); // Default to open tasks
-	let typeFilter = $state('all');
+	let selectedPriorities = $state(new Set(['0', '1', '2', '3'])); // All priorities by default
+	let selectedStatuses = $state(new Set(['open'])); // Default to open tasks only
+	let selectedTypes = $state(new Set()); // Empty = all types
 	let selectedLabels = $state(new Set());
 	let dragDisabled = $state(true);
+	let isDragging = $state(false);
 
 	// Sync filters with URL on mount and page changes
 	$effect(() => {
 		const params = new URLSearchParams(window.location.search);
 		searchQuery = params.get('search') || '';
-		priorityFilter = params.get('priority') || 'all';
-		statusFilter = params.get('status') || 'open'; // Default to 'open' to match initial state
-		typeFilter = params.get('type') || 'all';
+
+		const priorities = params.get('priorities');
+		if (priorities) {
+			selectedPriorities = new Set(priorities.split(','));
+		} else {
+			selectedPriorities = new Set(['0', '1', '2', '3']); // Default: all priorities
+		}
+
+		const statuses = params.get('statuses');
+		if (statuses) {
+			selectedStatuses = new Set(statuses.split(','));
+		} else {
+			selectedStatuses = new Set(['open']); // Default: open only
+		}
+
+		const types = params.get('types');
+		if (types) {
+			selectedTypes = new Set(types.split(','));
+		} else {
+			selectedTypes = new Set(); // Default: all types
+		}
 
 		const labels = params.get('labels');
 		if (labels) {
@@ -36,9 +55,15 @@
 		const params = new URLSearchParams();
 
 		if (searchQuery) params.set('search', searchQuery);
-		if (priorityFilter !== 'all') params.set('priority', priorityFilter);
-		if (statusFilter !== 'all') params.set('status', statusFilter);
-		if (typeFilter !== 'all') params.set('type', typeFilter);
+		if (selectedPriorities.size > 0 && selectedPriorities.size < 4) {
+			params.set('priorities', Array.from(selectedPriorities).join(','));
+		}
+		if (selectedStatuses.size > 0) {
+			params.set('statuses', Array.from(selectedStatuses).join(','));
+		}
+		if (selectedTypes.size > 0) {
+			params.set('types', Array.from(selectedTypes).join(','));
+		}
 		if (selectedLabels.size > 0) {
 			params.set('labels', Array.from(selectedLabels).join(','));
 		}
@@ -61,19 +86,19 @@
 			);
 		}
 
-		// Filter by priority
-		if (priorityFilter !== 'all') {
-			result = result.filter((task) => String(task.priority) === priorityFilter);
+		// Filter by priority (OR logic: task priority must be in selected set)
+		if (selectedPriorities.size > 0 && selectedPriorities.size < 4) {
+			result = result.filter((task) => selectedPriorities.has(String(task.priority)));
 		}
 
-		// Filter by status
-		if (statusFilter !== 'all') {
-			result = result.filter((task) => task.status === statusFilter);
+		// Filter by status (OR logic: task status must be in selected set)
+		if (selectedStatuses.size > 0) {
+			result = result.filter((task) => selectedStatuses.has(task.status));
 		}
 
-		// Filter by type
-		if (typeFilter !== 'all') {
-			result = result.filter((task) => task.issue_type === typeFilter);
+		// Filter by type (OR logic: task type must be in selected set)
+		if (selectedTypes.size > 0) {
+			result = result.filter((task) => selectedTypes.has(task.issue_type));
 		}
 
 		// Filter by labels (AND logic: task must have ALL selected labels)
@@ -105,6 +130,39 @@
 		return Array.from(typesSet).sort();
 	});
 
+	// Toggle priority selection
+	function togglePriority(priority) {
+		if (selectedPriorities.has(priority)) {
+			selectedPriorities.delete(priority);
+		} else {
+			selectedPriorities.add(priority);
+		}
+		selectedPriorities = new Set(selectedPriorities); // Trigger reactivity
+		updateURL();
+	}
+
+	// Toggle status selection
+	function toggleStatus(status) {
+		if (selectedStatuses.has(status)) {
+			selectedStatuses.delete(status);
+		} else {
+			selectedStatuses.add(status);
+		}
+		selectedStatuses = new Set(selectedStatuses); // Trigger reactivity
+		updateURL();
+	}
+
+	// Toggle type selection
+	function toggleType(type) {
+		if (selectedTypes.has(type)) {
+			selectedTypes.delete(type);
+		} else {
+			selectedTypes.add(type);
+		}
+		selectedTypes = new Set(selectedTypes); // Trigger reactivity
+		updateURL();
+	}
+
 	// Toggle label selection
 	function toggleLabel(label) {
 		if (selectedLabels.has(label)) {
@@ -119,9 +177,9 @@
 	// Clear all filters
 	function clearAllFilters() {
 		searchQuery = '';
-		priorityFilter = 'all';
-		statusFilter = 'all';
-		typeFilter = 'all';
+		selectedPriorities = new Set(['0', '1', '2', '3']); // Reset to all priorities
+		selectedStatuses = new Set(['open']); // Reset to open only
+		selectedTypes = new Set(); // Reset to all types
 		selectedLabels = new Set();
 		updateURL();
 	}
@@ -142,6 +200,7 @@
 
 	// Handle drag start - enable dragging
 	function handleDragStart(event) {
+		isDragging = true;
 		dragDisabled = false;
 		// Store task data for drop handling
 		const taskId = event.target.closest('[data-task-id]')?.dataset.taskId;
@@ -154,6 +213,21 @@
 	// Handle drag end - disable dragging
 	function handleDragEnd() {
 		dragDisabled = true;
+		// Delay resetting isDragging to prevent click event firing
+		setTimeout(() => {
+			isDragging = false;
+		}, 100);
+	}
+
+	// Handle task click - open drawer
+	function handleTaskClick(taskId) {
+		// Don't trigger click if we're dragging
+		if (isDragging) return;
+
+		// Emit event to parent component
+		if (ontaskclick) {
+			ontaskclick(taskId);
+		}
 	}
 </script>
 
@@ -172,44 +246,76 @@
 		/>
 
 		<!-- Filters -->
-		<div class="flex flex-col gap-2">
+		<div class="flex flex-col gap-3">
 			<!-- Priority Filter -->
-			<select
-				class="select select-bordered select-sm w-full"
-				bind:value={priorityFilter}
-				onchange={() => updateURL()}
-			>
-				<option value="all">All Priorities</option>
-				<option value="0">P0 (Critical)</option>
-				<option value="1">P1 (High)</option>
-				<option value="2">P2 (Medium)</option>
-				<option value="3">P3 (Low)</option>
-			</select>
+			<div class="form-control">
+				<label class="label py-1">
+					<span class="label-text text-xs">Priority ({selectedPriorities.size} selected)</span>
+				</label>
+				<div class="flex flex-wrap gap-1.5 p-2 bg-base-200 rounded-lg">
+					{#each ['0', '1', '2', '3'] as priority}
+						<button
+							class="badge badge-sm transition-all duration-200 cursor-pointer {selectedPriorities.has(priority) ? 'badge-primary shadow-md' : 'badge-ghost hover:badge-primary/20 hover:shadow-sm hover:scale-105'}"
+							onclick={() => togglePriority(priority)}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									togglePriority(priority);
+								}
+							}}
+						>
+							P{priority} <span class="ml-1 opacity-70">({tasks.filter((task) => String(task.priority) === priority).length})</span>
+						</button>
+					{/each}
+				</div>
+			</div>
 
 			<!-- Status Filter -->
-			<select
-				class="select select-bordered select-sm w-full"
-				bind:value={statusFilter}
-				onchange={() => updateURL()}
-			>
-				<option value="all">All Statuses</option>
-				<option value="open">Open</option>
-				<option value="blocked">Blocked</option>
-				<option value="ready">Ready</option>
-			</select>
+			<div class="form-control">
+				<label class="label py-1">
+					<span class="label-text text-xs">Status ({selectedStatuses.size} selected)</span>
+				</label>
+				<div class="flex flex-wrap gap-1.5 p-2 bg-base-200 rounded-lg">
+					{#each ['open', 'in_progress', 'blocked', 'closed'] as status}
+						<button
+							class="badge badge-sm transition-all duration-200 cursor-pointer {selectedStatuses.has(status) ? 'badge-primary shadow-md' : 'badge-ghost hover:badge-primary/20 hover:shadow-sm hover:scale-105'}"
+							onclick={() => toggleStatus(status)}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									toggleStatus(status);
+								}
+							}}
+						>
+							{status} <span class="ml-1 opacity-70">({tasks.filter((task) => task.status === status).length})</span>
+						</button>
+					{/each}
+				</div>
+			</div>
 
 			<!-- Type Filter -->
 			{#if availableTypes.length > 0}
-				<select
-					class="select select-bordered select-sm w-full"
-					bind:value={typeFilter}
-					onchange={() => updateURL()}
-				>
-					<option value="all">All Types</option>
-					{#each availableTypes as type}
-						<option value={type}>{type}</option>
-					{/each}
-				</select>
+				<div class="form-control">
+					<label class="label py-1">
+						<span class="label-text text-xs">Type ({selectedTypes.size > 0 ? selectedTypes.size : 'all'} selected)</span>
+					</label>
+					<div class="flex flex-wrap gap-1.5 p-2 bg-base-200 rounded-lg">
+						{#each availableTypes as type}
+							<button
+								class="badge badge-sm transition-all duration-200 cursor-pointer {selectedTypes.has(type) ? 'badge-primary shadow-md' : 'badge-ghost hover:badge-primary/20 hover:shadow-sm hover:scale-105'}"
+								onclick={() => toggleType(type)}
+								onkeydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										toggleType(type);
+									}
+								}}
+							>
+								{type} <span class="ml-1 opacity-70">({tasks.filter((task) => task.issue_type === type).length})</span>
+							</button>
+						{/each}
+					</div>
+				</div>
 			{/if}
 
 			<!-- Multi-select Label Filter -->
@@ -218,17 +324,20 @@
 					<label class="label py-1">
 						<span class="label-text text-xs">Labels ({selectedLabels.size} selected)</span>
 					</label>
-					<div class="bg-base-200 rounded-lg p-2 max-h-40 overflow-y-auto">
+					<div class="flex flex-wrap gap-1.5 p-2 bg-base-200 rounded-lg max-h-40 overflow-y-auto">
 						{#each availableLabels as label}
-							<label class="label cursor-pointer py-1">
-								<span class="label-text text-xs">{label}</span>
-								<input
-									type="checkbox"
-									class="checkbox checkbox-xs checkbox-primary"
-									checked={selectedLabels.has(label)}
-									onchange={() => toggleLabel(label)}
-								/>
-							</label>
+							<button
+								class="badge badge-sm transition-all duration-200 cursor-pointer {selectedLabels.has(label) ? 'badge-primary shadow-md' : 'badge-ghost hover:badge-primary/20 hover:shadow-sm hover:scale-105'}"
+								onclick={() => toggleLabel(label)}
+								onkeydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										toggleLabel(label);
+									}
+								}}
+							>
+								{label} <span class="ml-1 opacity-70">({tasks.filter((task) => task.labels?.includes(label)).length})</span>
+							</button>
 						{/each}
 					</div>
 				</div>
@@ -236,7 +345,7 @@
 		</div>
 
 		<!-- Active Filters as Badges -->
-		{#if searchQuery || priorityFilter !== 'all' || statusFilter !== 'all' || typeFilter !== 'all' || selectedLabels.size > 0}
+		{#if searchQuery || selectedPriorities.size < 4 || selectedStatuses.size > 0 || selectedTypes.size > 0 || selectedLabels.size > 0}
 			<div class="mt-3 mb-2">
 				<div class="text-xs text-base-content/50 mb-1">Active Filters:</div>
 				<div class="flex flex-wrap gap-1">
@@ -255,50 +364,41 @@
 						</span>
 					{/if}
 
-					{#if priorityFilter !== 'all'}
+					{#each Array.from(selectedPriorities) as priority}
 						<span class="badge badge-sm badge-warning gap-1">
-							P{priorityFilter}
+							P{priority}
 							<button
 								class="btn btn-ghost btn-xs p-0 h-auto min-h-0"
-								onclick={() => {
-									priorityFilter = 'all';
-									updateURL();
-								}}
+								onclick={() => togglePriority(priority)}
 							>
 								✕
 							</button>
 						</span>
-					{/if}
+					{/each}
 
-					{#if statusFilter !== 'all'}
+					{#each Array.from(selectedStatuses) as status}
 						<span class="badge badge-sm badge-info gap-1">
-							{statusFilter}
+							{status}
 							<button
 								class="btn btn-ghost btn-xs p-0 h-auto min-h-0"
-								onclick={() => {
-									statusFilter = 'all';
-									updateURL();
-								}}
+								onclick={() => toggleStatus(status)}
 							>
 								✕
 							</button>
 						</span>
-					{/if}
+					{/each}
 
-					{#if typeFilter !== 'all'}
+					{#each Array.from(selectedTypes) as type}
 						<span class="badge badge-sm badge-accent gap-1">
-							{typeFilter}
+							{type}
 							<button
 								class="btn btn-ghost btn-xs p-0 h-auto min-h-0"
-								onclick={() => {
-									typeFilter = 'all';
-									updateURL();
-								}}
+								onclick={() => toggleType(type)}
 							>
 								✕
 							</button>
 						</span>
-					{/if}
+					{/each}
 
 					{#each Array.from(selectedLabels) as label}
 						<span class="badge badge-sm badge-ghost gap-1">
@@ -346,7 +446,7 @@
 					/>
 				</svg>
 				<p>No tasks found</p>
-				{#if searchQuery || priorityFilter !== 'all' || statusFilter !== 'all' || typeFilter !== 'all' || selectedLabels.size > 0}
+				{#if searchQuery || selectedPriorities.size < 4 || selectedStatuses.size > 0 || selectedTypes.size > 0 || selectedLabels.size > 0}
 					<button class="btn btn-sm btn-ghost mt-2" onclick={clearAllFilters}>
 						Clear filters
 					</button>
@@ -356,11 +456,12 @@
 			{#each filteredTasks as task (task.id)}
 				{@const depStatus = analyzeDependencies(task)}
 				<div
-					class="card bg-base-100 border border-base-300 hover:border-primary cursor-move transition-all {!dragDisabled ? 'opacity-50' : ''} {depStatus.hasBlockers ? 'opacity-60 border-error/30' : ''}"
+					class="card bg-base-100 border border-base-300 hover:border-primary cursor-pointer transition-all {!dragDisabled ? 'opacity-50' : ''} {depStatus.hasBlockers ? 'opacity-60 border-error/30' : ''}"
 					draggable="true"
 					data-task-id={task.id}
 					ondragstart={handleDragStart}
 					ondragend={handleDragEnd}
+					onclick={() => handleTaskClick(task.id)}
 					title={depStatus.hasBlockers ? `⚠️ ${depStatus.blockingReason}` : ''}
 				>
 					<div class="card-body p-3">

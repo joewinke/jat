@@ -22,6 +22,7 @@
 	import ThemeSelector from './ThemeSelector.svelte';
 	import ProjectSelector from './ProjectSelector.svelte';
 	import UserProfile from './UserProfile.svelte';
+	import ClaudeUsageBar from './ClaudeUsageBar.svelte';
 
 	interface Props {
 		projects?: string[];
@@ -107,6 +108,9 @@
 		{#if unifiedNavConfig.showThemeSelector}
 			<ThemeSelector />
 		{/if}
+
+		<!-- Claude Usage Bar -->
+		<ClaudeUsageBar />
 
 		<!-- User Profile -->
 		<UserProfile />

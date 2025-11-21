@@ -126,24 +126,24 @@
 
 		// Use average tokens for color calculation
 		if (!data || data.length === 0) {
-			return 'oklch(var(--in))'; // info color
+			return '#3b82f6'; // Default blue
 		}
 
 		const avgTokens = data.reduce((sum, d) => sum + d.tokens, 0) / data.length;
 		const colorName = getUsageColor(avgTokens, 'today');
 
-		// Map color names to DaisyUI CSS variables
+		// Map color names to solid colors (CSS variables don't work reliably in SVG inline styles)
 		switch (colorName) {
 			case 'success':
-				return 'oklch(var(--su))';
+				return '#22c55e'; // Green
 			case 'info':
-				return 'oklch(var(--in))';
+				return '#3b82f6'; // Blue
 			case 'warning':
-				return 'oklch(var(--wa))';
+				return '#f59e0b'; // Orange
 			case 'error':
-				return 'oklch(var(--er))';
+				return '#ef4444'; // Red
 			default:
-				return 'oklch(var(--in))';
+				return '#3b82f6'; // Blue
 		}
 	});
 
