@@ -24,6 +24,16 @@
 		return unsubscribe;
 	});
 
+	// Auto-focus title input when drawer opens
+	$effect(() => {
+		if (isOpen && titleInput) {
+			// Small delay to ensure drawer animation starts
+			setTimeout(() => {
+				titleInput.focus();
+			}, 50);
+		}
+	});
+
 	// Form state
 	let formData = $state({
 		title: '',
@@ -40,6 +50,7 @@
 	let validationErrors = $state({});
 	let submitError = $state(null);
 	let successMessage = $state(null);
+	let titleInput: HTMLInputElement;
 
 	// Available options
 	const priorityOptions = [
@@ -225,6 +236,7 @@
 							class="input input-bordered w-full {validationErrors.title
 								? 'input-error'
 								: ''}"
+						bind:this={titleInput}
 							bind:value={formData.title}
 							disabled={isSubmitting}
 							required

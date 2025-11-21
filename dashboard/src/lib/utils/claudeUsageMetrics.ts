@@ -291,8 +291,6 @@ export async function fetchSessionContext(): Promise<SessionContext | null> {
     // To enable this feature:
     // 1. Get an API key from https://console.anthropic.com/
     // 2. Set ANTHROPIC_API_KEY environment variable
-    //
-    // For now, return null (graceful degradation)
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -300,33 +298,41 @@ export async function fetchSessionContext(): Promise<SessionContext | null> {
       return null;
     }
 
-    // Dynamically import Anthropic SDK (only on server-side)
-    const { default: Anthropic } = await import('@anthropic-ai/sdk');
-
-    // Make minimal API call to extract headers
-    const client = new Anthropic({ apiKey });
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 1,
-      messages: [{ role: 'user', content: 'ping' }]
+    // Make direct HTTP request to get response headers
+    // The Anthropic SDK doesn't expose HTTP headers, so we use fetch
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'ping' }]
+      })
     });
 
-    // Extract rate limit headers
-    // Note: Anthropic SDK doesn't expose raw headers directly
-    // We need to access the underlying response object
-    const headers = (response as any).response?.headers || {};
+    if (!response.ok) {
+      console.error('Anthropic API error:', response.status, response.statusText);
+      return null;
+    }
+
+    // Extract rate limit headers from HTTP response
+    const headers = response.headers;
 
     // Parse headers into SessionContext
     const sessionContext: SessionContext = {
-      requestsLimit: parseInt(headers['anthropic-ratelimit-requests-limit'] || '0'),
-      requestsRemaining: parseInt(headers['anthropic-ratelimit-requests-remaining'] || '0'),
-      requestsResetAt: new Date(headers['anthropic-ratelimit-requests-reset'] || Date.now() + 60000),
+      requestsLimit: parseInt(headers.get('anthropic-ratelimit-requests-limit') || '0'),
+      requestsRemaining: parseInt(headers.get('anthropic-ratelimit-requests-remaining') || '0'),
+      requestsResetAt: new Date(headers.get('anthropic-ratelimit-requests-reset') || Date.now() + 60000),
 
-      inputTokensLimit: parseInt(headers['anthropic-ratelimit-input-tokens-limit'] || '0'),
-      inputTokensRemaining: parseInt(headers['anthropic-ratelimit-input-tokens-remaining'] || '0'),
-      inputTokensResetAt: new Date(headers['anthropic-ratelimit-input-tokens-reset'] || Date.now() + 60000),
+      inputTokensLimit: parseInt(headers.get('anthropic-ratelimit-input-tokens-limit') || '0'),
+      inputTokensRemaining: parseInt(headers.get('anthropic-ratelimit-input-tokens-remaining') || '0'),
+      inputTokensResetAt: new Date(headers.get('anthropic-ratelimit-input-tokens-reset') || Date.now() + 60000),
 
-      outputTokensRemaining: parseInt(headers['anthropic-ratelimit-output-tokens-remaining'] || '0'),
+      outputTokensRemaining: parseInt(headers.get('anthropic-ratelimit-output-tokens-remaining') || '0'),
 
       tier: getSubscriptionTier(),
       fetchedAt: new Date()

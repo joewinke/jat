@@ -1704,291 +1704,46 @@ const command = `am-inbox "${agentName}" --json`;  // No --project flag
 
 ## Claude API Usage Metrics
 
-### Overview
-
-The dashboard includes a **Claude API Usage Bar** component that displays real-time metrics about Claude API usage, replacing the previous hour-based capacity estimation system. This system provides accurate, data-driven insights into API consumption and rate limits.
+The dashboard includes a **Claude API Usage Bar** component that displays real-time metrics about Claude API usage, replacing the previous hour-based capacity estimation system.
 
 **Location:** Fixed bottom-right of screen (hover to expand)
 
-**Component:** `src/lib/components/ClaudeUsageBar.svelte`
+**What it shows:**
+- Subscription tier (FREE, BUILD, MAX) with rate limits
+- Optional: Real-time session context from API headers
+- Agent activity metrics (working/idle/sleeping agents)
 
-### What Metrics Are Displayed
+**Key Features:**
+- Hover-to-expand stats widget
+- 30-second auto-refresh polling
+- Multi-layer caching (30s for session context, 60s for agent metrics)
+- Graceful degradation when data unavailable
 
-The usage bar shows three primary categories of metrics:
+**Quick Start:**
+```bash
+# Component automatically fetches tier from ~/.claude/.credentials.json
+# No configuration needed for basic tier display
 
-#### 1. Subscription Tier Information
-
-**Compact Badge (Default State):**
-- Subscription tier (FREE, BUILD, or MAX)
-- Per-minute token limit
-- Color-coded badge based on tier
-
-**Hover/Expanded State Shows:**
-- **Rate Limits by Tier:**
-  - Tokens per minute
-  - Tokens per day
-  - Requests per minute (coming soon)
-  - Requests per day (coming soon)
-
-#### 2. Session Context (Real-time from API Headers)
-
-**When available** (requires ANTHROPIC_API_KEY environment variable):
-- Current per-minute request quota remaining
-- Current per-minute input token quota remaining
-- Current output token quota remaining
-- Reset timestamps for quotas
-
-**Status:** Optional - gracefully degrades to showing tier limits only if API key not configured
-
-#### 3. Agent Activity Metrics
-
-**From Agent Mail system** (`am-agents`):
-- Total agents registered
-- Working agents (active in last 10 minutes)
-- Idle agents (active 10-60 minutes ago)
-- Sleeping agents (inactive >1 hour)
-- System load percentage
-
-### Data Sourcing Architecture
-
-#### Tier Detection
-
-**Source:** `~/.claude/.credentials.json`
-
-**Method:** Server-side file read of Claude Code OAuth credentials
-
-**Structure:**
-```json
-{
-  "claudeAiOauth": {
-    "subscriptionType": "max",
-    "rateLimitTier": "default_claude_max_20x"
-  }
-}
+# Optional: Enable real-time session context
+export ANTHROPIC_API_KEY=sk-ant-api03-...  # Get from console.anthropic.com
+npm run dev
 ```
 
-**Tier Rate Limits:**
+**Files:**
+- `src/lib/components/ClaudeUsageBar.svelte` - UI component
+- `src/lib/utils/claudeUsageMetrics.ts` - Data fetching utility
+- `src/routes/api/claude/usage/+server.js` - API endpoint
 
-| Tier | Tokens/min | Tokens/day | Requests/min | Requests/day |
-|------|------------|------------|--------------|--------------|
-| free | 50K | 150K | 50 | 100 |
-| build | 200K | 600K | 100 | 2,000 |
-| max | 2M | 10M | 2,000 | 10,000 |
-
-**Reference:** [Anthropic Rate Limits Documentation](https://docs.anthropic.com/en/api/rate-limits)
-
-#### Session Context Fetching (Optional)
-
-**Source:** Anthropic API rate limit headers
-
-**Requirements:**
-1. `ANTHROPIC_API_KEY` environment variable set (separate from OAuth token)
-2. `@anthropic-ai/sdk` npm package installed
-3. Network access to Anthropic API
-
-**Implementation:**
-```typescript
-// Make minimal API call to extract headers
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const response = await client.messages.create({
-  model: 'claude-sonnet-4-5-20250929',
-  max_tokens: 1,
-  messages: [{ role: 'user', content: 'ping' }]
-});
-
-// Parse headers
-const headers = response.response?.headers || {};
-// Extract: anthropic-ratelimit-requests-remaining,
-//          anthropic-ratelimit-input-tokens-remaining, etc.
-```
-
-**Why Optional:**
-Most users don't have a separate Anthropic API key (only OAuth token from Claude.ai). The system gracefully shows tier limits without real-time session context.
-
-**To Enable:**
-1. Get API key from https://console.anthropic.com/
-2. Set `ANTHROPIC_API_KEY=sk-ant-api03-...` in environment
-3. Restart dev server
-
-#### Agent Metrics Fetching
-
-**Source:** Agent Mail system (`am-agents` command)
-
-**Implementation:**
-```typescript
-// Execute shell command
-const { stdout } = await execAsync('am-agents --json');
-const agents = JSON.parse(stdout);
-
-// Calculate status based on last activity timestamp
-const working = agents.filter(a => {
-  const minutesSinceActivity = (Date.now() - new Date(a.last_activity_ts).getTime()) / 60000;
-  return minutesSinceActivity < 10; // Active in last 10 minutes
-}).length;
-```
-
-**Agent Status Thresholds:**
-- **Working:** Active within last 10 minutes
-- **Idle:** Active 10-60 minutes ago
-- **Sleeping:** Inactive for over 1 hour
-
-### Caching & Refresh Behavior
-
-The system uses a multi-layer caching strategy to prevent API hammering:
-
-#### Cache Durations
-
-| Data Type | Cache TTL | Rationale |
-|-----------|-----------|-----------|
-| Subscription Tier | No cache | Read from local file (instant) |
-| Session Context | 30 seconds | Real-time rate limits |
-| Agent Metrics | 60 seconds | Reasonable freshness |
-
-#### Polling Strategy
-
-**Component-Level:**
-- ClaudeUsageBar polls `/api/claude/usage` every **30 seconds**
-- Automatic refresh in background (no user interaction needed)
-
-**API-Level:**
-- `/api/claude/usage` endpoint checks cache first
-- Only makes external calls if cache expired
-- Returns cached data immediately if available
-
-**Benefits:**
-- Reduces Anthropic API calls (1 ping every 30 sec vs 1 per component render)
-- Faster response times (cached data served in <1ms)
-- Prevents rate limit exhaustion
-
-### Color-Coded Thresholds
-
-The UI uses color coding to indicate subscription tier:
-
-| Tier | Badge Color | Class | Visual |
-|------|-------------|-------|--------|
-| max | Accent (purple) | `badge-accent` | 🟣 MAX |
-| build | Primary (blue) | `badge-primary` | 🔵 BUILD |
-| free | Secondary (gray) | `badge-secondary` | ⚪ FREE |
-
-### Troubleshooting
-
-#### Metrics Show "N/A" or Are Missing
-
-**Symptom:** Usage bar appears but shows no data or "N/A" values
-
-**Possible Causes:**
-
-1. **Credentials File Missing**
-   ```bash
-   # Check if credentials exist
-   ls -la ~/.claude/.credentials.json
-
-   # Expected output: File exists with read permissions
-   # If missing: Run Claude Code at least once to generate credentials
-   ```
-
-2. **Malformed Credentials JSON**
-   ```bash
-   # Validate JSON structure
-   cat ~/.claude/.credentials.json | jq '.'
-
-   # Should show valid JSON with claudeAiOauth object
-   # If error: Backup and regenerate credentials
-   ```
-
-3. **Session Context Unavailable (Expected)**
-   - This is NORMAL if `ANTHROPIC_API_KEY` not set
-   - System will only show tier limits (not real-time usage)
-   - Not an error - graceful degradation by design
-
-4. **Agent Metrics Missing**
-   ```bash
-   # Test Agent Mail integration
-   am-agents --json
-
-   # Should return JSON array of agents
-   # If error: Check Agent Mail installation
-   ```
-
-#### Component Not Appearing
-
-**Symptom:** No usage bar visible on screen
-
-**Check:**
-1. **Verify component is imported** in page:
-   ```svelte
-   <!-- pages should NOT import - it's in +layout.svelte -->
-   <!-- Only root layout should have: -->
-   <ClaudeUsageBar />
-   ```
-
-2. **Check console for errors:**
-   ```javascript
-   // Browser DevTools → Console
-   // Look for: "Error loading Claude usage metrics"
-   ```
-
-3. **Verify API endpoint:**
-   ```bash
-   # Test endpoint directly
-   curl http://localhost:5173/api/claude/usage
-
-   # Should return JSON with tier, tierLimits, etc.
-   ```
-
-#### High Error Rate
-
-**Symptom:** Console shows repeated "Error fetching session context"
-
-**Cause:** Missing or invalid `ANTHROPIC_API_KEY`
-
-**Solution:**
-- If you don't need real-time session context: **Ignore this error** (expected behavior)
-- If you want session context: Set valid API key in environment
-
-### Files Reference
-
-**Core Implementation:**
-- `src/lib/components/ClaudeUsageBar.svelte` - UI component (200 lines)
-- `src/lib/utils/claudeUsageMetrics.ts` - Data fetching utility (530 lines)
-- `src/routes/api/claude/usage/+server.js` - API endpoint (43 lines)
-
-**Integration Points:**
-- `src/routes/+layout.svelte` - Where component is rendered (global)
-- `~/.claude/.credentials.json` - Subscription tier source
-- Agent Mail database - Agent activity source
-
-**Documentation:**
-- `dashboard/docs/claude-api-usage-research.md` - Research and design decisions
-
-### Future Enhancements
-
-**Planned (Not Yet Implemented):**
-
-1. **Token Burn Rate Estimation**
-   - Track API usage over time
-   - Estimate tokens/hour consumption
-   - Predict hours remaining at current rate
-
-2. **Per-Agent Token Tracking**
-   - Parse `~/.claude/projects/{project}/*.jsonl` session files
-   - Aggregate token usage by agent
-   - Display in AgentCard component tooltips
-
-3. **Cost Tracking**
-   - Apply Sonnet 4.5 pricing ($3/MTok input, $15/MTok output)
-   - Show daily/weekly cost estimates
-   - Budget alerts when approaching limits
-
-4. **Historical Charts**
-   - Token usage trends over time
-   - Peak usage identification
-   - Cost optimization recommendations
+**📖 Full Documentation:** See [`docs/claude-api-usage-metrics-guide.md`](docs/claude-api-usage-metrics-guide.md) for:
+- Complete metrics breakdown
+- Data sourcing architecture
+- Troubleshooting guide
+- Future enhancements
 
 **Task References:**
 - jat-sk1: Claude API usage data fetching (completed)
 - jat-1ux: Replace SystemCapacityBar with ClaudeUsageBar (completed)
-- jat-ozq: Document Claude API usage metrics (this section)
+- jat-ozq: Document Claude API usage metrics (completed)
 
 ## Development Commands
 
