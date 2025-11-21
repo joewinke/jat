@@ -1,68 +1,49 @@
 /**
  * Navigation Configuration
- * Lightweight config structure for dashboard pages (~50 lines, not 874)
+ * Unified config for dashboard navigation (replaces page-specific configs)
  */
 
-export interface ViewToggleOption {
-	value: string;
-	label: string;
-	link?: string; // For cross-page navigation (e.g., List View → /)
+export interface NavItem {
+	id: string; // Unique identifier (e.g., 'list', 'graph', 'agents')
+	label: string; // Display text (e.g., 'List', 'Graph', 'Agents')
+	href: string; // Navigation target (e.g., '/', '/agents')
+	icon: string; // Icon identifier (matches icon SVG paths in Nav.svelte)
 }
 
-export interface BreadcrumbItem {
-	label: string;
-	href?: string; // Omit for current page (last item)
+export interface UnifiedNavConfig {
+	navItems: NavItem[]; // All navigation items (rendered as buttons in nav bar)
+	showProjectFilter: boolean; // Show project selector dropdown
+	showThemeSelector: boolean; // Show theme picker
 }
 
-export interface NavConfig {
-	title: string;
-	subtitle: string;
-	viewToggle?: ViewToggleOption[];
-	showProjectFilter?: boolean;
-	showThemeSelector?: boolean;
-	breadcrumbs?: BreadcrumbItem[]; // Navigation path
-}
-
-// Home Page (List View)
-export const homeConfig: NavConfig = {
-	title: 'Beads Task Dashboard',
-	subtitle: 'Multi-project task management powered by Beads + Agent Mail',
-	viewToggle: [
-		{ value: 'list', label: 'List' },
-		{ value: 'graph', label: 'Graph' }
-	],
-	showProjectFilter: false,
-	showThemeSelector: true,
-	breadcrumbs: [
-		{ label: 'Home' } // Current page, no href
-	]
-};
-
-// Agents Page (Agent View)
-export const agentsConfig: NavConfig = {
-	title: 'Agents',
-	subtitle: 'Task assignment and agent coordination powered by Agent Mail + Beads',
-	viewToggle: [
-		{ value: 'list', label: 'List View', link: '/' },
-		{ value: 'agents', label: 'Agent View', link: '/agents' }
+/**
+ * Unified Navigation Configuration
+ *
+ * Defines all navigation items and global nav settings.
+ * Nav component imports this and renders nav items as buttons with active state.
+ * Page-specific logic removed - Nav is now agnostic to which page it's on.
+ */
+export const unifiedNavConfig: UnifiedNavConfig = {
+	navItems: [
+		{
+			id: 'list',
+			label: 'List',
+			href: '/',
+			icon: 'list'
+		},
+		{
+			id: 'graph',
+			label: 'Graph',
+			href: '/?view=graph',
+			icon: 'graph'
+		},
+		{
+			id: 'agents',
+			label: 'Agents',
+			href: '/agents',
+			icon: 'users'
+		}
 	],
 	showProjectFilter: true,
-	showThemeSelector: true,
-	breadcrumbs: [
-		{ label: 'Home', href: '/' },
-		{ label: 'Agents' } // Current page
-	]
-};
-
-// API Demo Page
-export const apiDemoConfig: NavConfig = {
-	title: 'Agents API Demo',
-	subtitle: 'Live integration showcase for /api/agents endpoint + reactive store',
-	viewToggle: undefined, // No view toggle on this page
-	showProjectFilter: false,
-	showThemeSelector: true,
-	breadcrumbs: [
-		{ label: 'Home', href: '/' },
-		{ label: 'API Demo' } // Current page
-	]
+	showThemeSelector: true
 };
