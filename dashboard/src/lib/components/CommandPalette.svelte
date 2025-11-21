@@ -13,12 +13,22 @@
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import TaskCreationDrawer from './TaskCreationDrawer.svelte';
 
 	// Modal state
 	let isOpen = $state(false);
 	let searchQuery = $state('');
 	let selectedIndex = $state(0);
 	let searchInput: HTMLInputElement;
+
+	// Drawer state
+	let isDrawerOpen = $state(false);
+
+	// Task search state
+	let searchMode = $state<'actions' | 'tasks'>('actions'); // 'actions' = command palette, 'tasks' = task search
+	let tasks = $state([]);
+	let isLoadingTasks = $state(false);
+	let searchDebounceTimer: number;
 
 	// Action registry
 	interface Action {
@@ -67,13 +77,12 @@
 		{
 			id: 'create-task',
 			label: 'Create Task',
-			description: 'Open task creation modal',
+			description: 'Open task creation drawer',
 			icon: '➕',
 			keywords: ['create', 'new', 'task', 'add'],
 			execute: () => {
-				// TODO: Implement task creation modal
-				alert('Task creation coming soon!');
 				close();
+				isDrawerOpen = true;
 			}
 		},
 		{
@@ -83,9 +92,12 @@
 			icon: '🔍',
 			keywords: ['search', 'find', 'filter', 'query'],
 			execute: () => {
-				// TODO: Implement search functionality
-				alert('Search coming soon!');
-				close();
+				// Switch to task search mode
+				searchMode = 'tasks';
+				searchQuery = '';
+				selectedIndex = 0;
+				tasks = [];
+				// Don't close - stay in modal for search
 			}
 		},
 		{
@@ -154,11 +166,53 @@
 	// Filtered actions based on search
 	const filteredActions = $derived(searchActions(searchQuery));
 
+	// Task search function with debouncing
+	async function searchTasks(query: string) {
+		// Clear existing timer
+		if (searchDebounceTimer) {
+			clearTimeout(searchDebounceTimer);
+		}
+
+		// If query is empty, clear tasks
+		if (!query.trim()) {
+			tasks = [];
+			isLoadingTasks = false;
+			return;
+		}
+
+		// Set loading state
+		isLoadingTasks = true;
+
+		// Debounce API call (300ms)
+		searchDebounceTimer = setTimeout(async () => {
+			try {
+				const response = await fetch(`/api/tasks?search=${encodeURIComponent(query)}`);
+				const data = await response.json();
+				tasks = data.tasks || [];
+			} catch (error) {
+				console.error('Task search error:', error);
+				tasks = [];
+			} finally {
+				isLoadingTasks = false;
+			}
+		}, 300) as unknown as number;
+	}
+
+	// Trigger task search when query changes (only in task mode)
+	$effect(() => {
+		if (searchMode === 'tasks' && searchQuery) {
+			searchTasks(searchQuery);
+		}
+	});
+
 	// Open/close functions
 	function open() {
 		isOpen = true;
 		searchQuery = '';
 		selectedIndex = 0;
+		searchMode = 'actions'; // Reset to actions mode
+		tasks = [];
+		isLoadingTasks = false;
 
 		// Focus input after modal opens
 		setTimeout(() => {
@@ -170,6 +224,14 @@
 		isOpen = false;
 		searchQuery = '';
 		selectedIndex = 0;
+		searchMode = 'actions'; // Reset to actions mode
+		tasks = [];
+		isLoadingTasks = false;
+
+		// Clear any pending search timers
+		if (searchDebounceTimer) {
+			clearTimeout(searchDebounceTimer);
+		}
 	}
 
 	// Keyboard navigation
@@ -225,6 +287,13 @@
 			selectedIndex = 0;
 		}
 	});
+
+	// Handle task creation success
+	function handleTaskCreated(task: any) {
+		console.log('Task created:', task);
+		// Could navigate to the task or refresh data here
+		// For now, just log it
+	}
 </script>
 
 <!-- Modal -->
@@ -326,3 +395,6 @@
 		</div>
 	</div>
 {/if}
+
+<!-- Task Creation Drawer -->
+<TaskCreationDrawer bind:isOpen={isDrawerOpen} onTaskCreated={handleTaskCreated} />
