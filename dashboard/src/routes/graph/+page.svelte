@@ -27,16 +27,31 @@
 	// Sync selectedProject from URL params
 	$effect(() => {
 		const projectParam = $page.url.searchParams.get('project');
-		selectedProject = projectParam || 'All Projects';
+		const newProject = projectParam || 'All Projects';
+
+		console.log('🔵 [Graph Page] URL changed');
+		console.log('  → Project param:', projectParam);
+		console.log('  → New project:', newProject);
+		console.log('  → Previous project:', selectedProject);
+
+		selectedProject = newProject;
 	});
 
 	// Filter tasks by project
 	const filteredTasks = $derived(() => {
+		console.log('🟢 [Graph Page] Filtering tasks');
+		console.log('  → Selected project:', selectedProject);
+		console.log('  → Total tasks:', allTasks.length);
+
 		if (!selectedProject || selectedProject === 'All Projects') {
+			console.log('  → Returning all tasks');
 			return allTasks;
 		}
+
 		// Filter by project prefix (e.g., "jat-abc" matches "jat")
-		return allTasks.filter((task) => task.id.startsWith(selectedProject + '-'));
+		const filtered = allTasks.filter((task) => task.id.startsWith(selectedProject + '-'));
+		console.log('  → Filtered tasks:', filtered.length);
+		return filtered;
 	});
 
 	// Fetch tasks
