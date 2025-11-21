@@ -244,7 +244,7 @@
 	});
 </script>
 
-<div class="w-full bg-base-100 rounded-lg p-4 shadow">
+<div class="w-full bg-base-100 rounded-lg p-4 shadow overflow-x-auto">
 	<svg bind:this={svgElement}></svg>
 </div>
 
