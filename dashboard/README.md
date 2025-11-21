@@ -15,7 +15,8 @@ The Beads Task Dashboard provides a unified web interface for viewing and managi
 
 **Key Features:**
 
-- **Multi-Project View** - See tasks from all projects (Chimaro, Jomarchy, JAT, etc.) in one place
+- **Multi-Project View** - Aggregates tasks from all projects in `~/code/*` with intelligent project detection
+- **Project Filtering** - Filter by project via dropdown or URL parameter (`?project=chimaro`)
 - **Dependency Graph Visualization** - Interactive D3.js force-directed graph showing task relationships
 - **Advanced Filtering** - Filter by project, priority (P0-P3), status, and search query
 - **32 DaisyUI Themes** - Switch between light/dark themes with live preview
@@ -67,12 +68,38 @@ The dashboard displays all tasks from your Beads-enabled projects. Each task sho
 
 Use the filter controls at the top to narrow down tasks:
 
-- **Project** - Show tasks from specific project or all
+- **Project** - Show tasks from specific project or all projects
 - **Priority** - Filter by P0, P1, P2, P3, or all
 - **Status** - Open or Closed tasks
 - **Search** - Free-text search across titles and descriptions
 
 Filters are reactive and update instantly using Svelte 5's `$derived` rune.
+
+#### Multi-Project Filtering
+
+The dashboard automatically detects projects from task ID prefixes (e.g., `chimaro-abc`, `jat-xyz`, `jomarchy-123`) and provides intelligent filtering:
+
+**Key Features:**
+- **Automatic Detection** - Projects discovered from task IDs, no configuration needed
+- **URL-Based** - Filter via `?project=chimaro` parameter (bookmarkable)
+- **Task Counts** - Shows task count per project in dropdown
+- **Persistence** - Page reload preserves selected project
+- **Shareable** - Copy URL to share filtered view with team
+
+**Example URLs:**
+```
+/agents                      → All projects
+/agents?project=chimaro      → Only chimaro tasks
+/agents?project=jat          → Only jat tasks
+```
+
+**Combined Filters:**
+```
+/agents?project=jat&priority=P0&status=open
+→ Shows P0 open tasks from jat project only
+```
+
+For developer documentation on project filtering, see `dashboard/CLAUDE.md`.
 
 ### Task Details
 
