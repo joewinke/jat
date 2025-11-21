@@ -209,6 +209,154 @@ $effect(() => {
 });
 ```
 
+## UI Patterns: Unified Queue/Drop Zone
+
+### Overview
+
+The **AgentCard** component (`src/lib/components/agents/AgentCard.svelte`) implements a unified Queue/Drop Zone pattern. This is a key UX pattern in the dashboard that future contributors should understand.
+
+### The Pattern
+
+**What:** Queue section and drop zone are merged into a single, multi-state UI component.
+
+**Why:** Reduces visual redundancy, lowers cognitive load, and provides clearer user feedback.
+
+**Where:** Lines 627-693 in `AgentCard.svelte` (with detailed comment block explaining rationale)
+
+### Design Rationale
+
+**Before (Separate Sections):**
+```
+┌─ Agent Card ──────────┐
+│ Queue (3 tasks)       │
+│ • Task 1              │
+│ • Task 2              │
+│ • Task 3              │
+├───────────────────────┤
+│ Drop Zone             │
+│ [Drop tasks here]     │
+└───────────────────────┘
+```
+
+**Problem:** Redundant sections, more visual noise, wastes space.
+
+**After (Unified):**
+```
+┌─ Agent Card ──────────┐
+│ Queue (3 tasks)       │
+│ • Task 1              │
+│ • Task 2              │
+│ • Task 3              │
+│                       │
+│ [Entire section is    │
+│  drop target with     │
+│  visual feedback]     │
+└───────────────────────┘
+```
+
+**Solution:** One section serves dual purpose - cleaner, more intuitive.
+
+### Visual States (5 States)
+
+| State | Border | Background | Feedback | Can Drop? |
+|-------|--------|------------|----------|-----------|
+| **Default** | Solid neutral | None | Shows queued tasks | Yes (on drag) |
+| **Success** | Dashed green | `bg-success/10` | ✓ "Drop to assign" | Yes |
+| **Dependency Block** | Dashed red | `bg-error/10` | ✗ Shows blocking task | No |
+| **File Conflict** | Dashed red | `bg-error/10` | ⚠ Lists conflicts | No |
+| **Assigning** | Solid neutral | Blur overlay | ⏳ Loading spinner | No |
+
+**Critical:** All 5 states serve a purpose. Don't remove any without understanding impact.
+
+### State Management
+
+```svelte
+let isDragOver = $state(false);           // Drag cursor over section?
+let hasConflict = $state(false);          // File reservation conflicts?
+let hasDependencyBlock = $state(false);   // Unmet task dependencies?
+let isAssigning = $state(false);          // Assignment API call in progress?
+let assignError = $state(null);           // Assignment error message
+```
+
+**State Transitions:**
+```
+Default → (drag enters) → Success/Block/Conflict
+Success → (drop) → Assigning → Success/Error → Default
+Block/Conflict → (drag leaves) → Default
+```
+
+### Drag-Drop Implementation
+
+**Key Functions:**
+- `handleDragOver(event)` - Detect conflicts/blocks, set visual state
+- `handleDrop(event)` - Validate and execute assignment
+- `handleDragLeave()` - Reset state when drag exits
+- `detectConflicts(taskId)` - Check file reservation conflicts
+- `analyzeDependencies(task)` - Check dependency blocks
+
+**Drop Behavior:**
+- **Entire queue section is droppable** (not just empty space)
+- Conflicts/blocks prevent drop (`event.dataTransfer.dropEffect = 'none'`)
+- New tasks appear at **top** of queue after successful assignment
+- Visual feedback is immediate and reactive
+
+### Error Handling Philosophy
+
+**Inline Errors (Preferred):**
+- Shows error message **inside** the drop zone
+- User sees error in context of action
+- Detailed messages explain **why** and **how to fix**
+
+**Examples:**
+- "Dependency Block! Complete task-xyz first"
+- "File Conflict! src/\*\*/\*.ts conflicts with dashboard/\*\*"
+- "Assignment timed out after 30 seconds"
+
+**Not Used:**
+- Toast notifications (lose context)
+- Modal dialogs (interrupt flow)
+- Generic errors ("Failed to assign task")
+
+### For Contributors
+
+**When modifying this pattern:**
+
+1. **Test all 5 states** - Drag tasks with/without dependencies, conflicts
+2. **Keep error messages specific** - Tell users exactly what's wrong
+3. **Don't shrink drop target** - Entire section must remain droppable
+4. **Preserve visual feedback** - Border/background changes are critical UX
+5. **Check mobile** - Touch interactions should work (test on small screens)
+
+**Common mistakes to avoid:**
+- ❌ Making drop zone a small box inside queue
+- ❌ Removing error states ("just show success/fail")
+- ❌ Generic error messages ("Something went wrong")
+- ❌ Modal dialogs for errors (breaks inline pattern)
+- ❌ Changing border/background styles without purpose
+
+**Files to review:**
+- Component: `src/lib/components/agents/AgentCard.svelte` (lines 627-693)
+- README: `dashboard/README.md` (search "Unified Queue/Drop Zone")
+- Dependency utils: `src/lib/utils/dependencyUtils.ts`
+
+### User Testing Insights
+
+This pattern was validated through user feedback:
+
+**Users preferred:**
+- ✅ Single queue section (less clutter)
+- ✅ Inline error messages (immediate context)
+- ✅ Entire section as drop target (easier to use)
+- ✅ Detailed error messages (actionable guidance)
+
+**Users rejected:**
+- ❌ Separate drop zone (felt redundant)
+- ❌ Toast notifications (lose context)
+- ❌ Small drop zones (hard to hit)
+- ❌ Generic errors ("not helpful")
+
+**Key Quote:** *"I like that I can see exactly why the task can't be assigned right where I'm trying to drop it."*
+
 ## Development Commands
 
 ```bash

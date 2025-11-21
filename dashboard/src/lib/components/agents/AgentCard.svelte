@@ -7,6 +7,7 @@
 
 	let isDragOver = $state(false);
 	let isAssigning = $state(false);
+	let assignError = $state(null);
 	let hasConflict = $state(false);
 	let conflictReasons = $state([]);
 	let hasDependencyBlock = $state(false);
@@ -203,15 +204,31 @@
 		const taskId = event.dataTransfer.getData('text/plain');
 		if (!taskId) return;
 
-		// Show loading state
+		// Clear previous errors and show loading state
+		assignError = null;
 		isAssigning = true;
 
 		try {
-			// Call parent callback to assign task
-			await onTaskAssign(taskId, agent.name);
+			// Call parent callback to assign task with timeout (30 seconds)
+			const timeoutPromise = new Promise((_, reject) =>
+				setTimeout(() => reject(new Error('Assignment timed out after 30 seconds')), 30000)
+			);
+
+			await Promise.race([
+				onTaskAssign(taskId, agent.name),
+				timeoutPromise
+			]);
+
+			// Success - clear any errors
+			assignError = null;
 		} catch (error) {
 			console.error('Failed to assign task:', error);
-			// TODO: Show error toast/notification
+			assignError = error.message || 'Failed to assign task';
+
+			// Auto-clear error after 5 seconds
+			setTimeout(() => {
+				assignError = null;
+			}, 5000);
 		} finally {
 			isAssigning = false;
 		}
@@ -538,7 +555,7 @@
 </script>
 
 <div
-	class="card bg-base-100 border-2 transition-all relative {isDragOver && hasConflict ? 'border-error border-dashed bg-error/10 scale-105' : isDragOver ? 'border-success border-dashed bg-success/10 scale-105' : 'border-base-300 hover:border-primary'} {isAssigning ? 'opacity-50 pointer-events-none' : ''}"
+	class="card bg-base-100 border-2 transition-all relative {isDragOver && hasConflict ? 'border-error border-dashed bg-error/10 scale-105' : isDragOver ? 'border-success border-dashed bg-success/10 scale-105' : 'border-base-300 hover:border-primary'} {isAssigning ? 'pointer-events-none' : ''}"
 	role="button"
 	tabindex="0"
 	ondrop={handleDrop}
@@ -546,6 +563,16 @@
 	ondragleave={handleDragLeave}
 	oncontextmenu={handleContextMenu}
 >
+	<!-- Loading Overlay -->
+	{#if isAssigning}
+		<div class="absolute inset-0 bg-base-300/80 backdrop-blur-sm rounded-lg z-50 flex items-center justify-center">
+			<div class="text-center">
+				<span class="loading loading-spinner loading-lg text-primary"></span>
+				<p class="text-sm font-medium text-base-content mt-2">Assigning task...</p>
+			</div>
+		</div>
+	{/if}
+
 	<div class="card-body p-4">
 		<!-- Agent Header -->
 		<div class="flex items-start justify-between gap-2 mb-3">
@@ -597,7 +624,71 @@
 		</div>
 
 		{#if queuedTasks().length > 0}
-		<!-- Queued Tasks / Drop Zone (Unified) -->
+		<!--
+		╔════════════════════════════════════════════════════════════════════════════╗
+		║ UNIFIED QUEUE / DROP ZONE PATTERN                                         ║
+		╚════════════════════════════════════════════════════════════════════════════╝
+
+		DESIGN DECISION: Queue and Drop Zone are merged into a single section
+
+		WHY THIS PATTERN?
+		• Reduces visual redundancy (one section instead of two)
+		• Lowers cognitive load (clearer UX with less clutter)
+		• Better space utilization on agent cards
+		• Natural drop target (entire queue section is droppable)
+
+		VISUAL STATES (5 states):
+
+		1. DEFAULT (has queued tasks):
+		   - Solid border (border-base-300)
+		   - Shows list of queued tasks (up to 3 visible)
+		   - "+N more" indicator if > 3 tasks
+
+		2. DRAG OVER + SUCCESS:
+		   - Dashed green border (border-success border-dashed)
+		   - Green background tint (bg-success/10)
+		   - Checkmark icon + "Drop to assign to {agent}" message
+		   - Scale up effect (scale-105)
+
+		3. DRAG OVER + DEPENDENCY BLOCK:
+		   - Dashed red border (border-error border-dashed)
+		   - Red background tint (bg-error/10)
+		   - X icon + "Dependency Block!" header
+		   - Shows specific blocking reason
+		   - Drop is prevented (cursor: not-allowed)
+
+		4. DRAG OVER + FILE CONFLICT:
+		   - Dashed red border (border-error border-dashed)
+		   - Red background tint (bg-error/10)
+		   - Warning icon + "File Conflict!" header
+		   - Lists conflicting file patterns
+		   - Drop is prevented (cursor: not-allowed)
+
+		5. ASSIGNING (loading):
+		   - Loading spinner
+		   - "Assigning task..." message
+		   - Disabled pointer events during assignment
+
+		DRAG-DROP INTERACTION:
+		• Entire section is a drop target (not just empty space)
+		• Parent card handles drop logic (lines 183-235)
+		• Conflict detection runs on dragover (lines 322-344)
+		• New tasks are added to top of queue after assignment
+		• Visual feedback is immediate and clear
+
+		USER PREFERENCES THAT INFORMED THIS DESIGN:
+		• Users preferred cleaner, less busy interface
+		• Separate drop zone felt redundant when queue exists
+		• Visual feedback should be inline (not modal/toast)
+		• Error messages should be detailed and actionable
+
+		IMPLEMENTATION NOTES:
+		• State management: isDragOver, hasConflict, hasDependencyBlock
+		• Border and background change reactively based on drag state
+		• Drop handler validates dependencies + conflicts before assignment
+		• Entire section scales on hover for clear drop affordance
+	-->
+	<!-- Queued Tasks / Drop Zone (Unified) -->
 		<div class="mb-3">
 			<div class="text-xs font-medium text-base-content/70 mb-1">
 				Queue ({queuedTasks().length}):
@@ -665,6 +756,19 @@
 				{/if}
 			</div>
 		{/if}
+
+		<!-- Assignment Error Alert -->
+		{#if assignError}
+			<div class="mb-3">
+				<div class="alert alert-error text-xs py-2">
+					<svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-4 w-4" fill="none" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+					</svg>
+					<span>{assignError}</span>
+				</div>
+			</div>
+		{/if}
+
 		<!-- File Locks -->
 		<div>
 			<div class="text-xs font-medium text-base-content/70 mb-1">

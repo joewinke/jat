@@ -233,6 +233,136 @@ Props can be bound bidirectionally between parent and child components, replacin
 - **Universal Reactivity** - Works in `.svelte` and `.svelte.ts` files
 - **Signal-Based** - Fine-grained reactivity similar to Solid.js/Qwik
 
+### UI Pattern: Unified Queue/Drop Zone
+
+The AgentCard component implements a merged Queue/Drop Zone pattern that reduces visual clutter and improves UX.
+
+#### Design Decision
+
+Instead of having separate "Queued Tasks" and "Drop Zone" sections, we merged them into a single unified section. This decision was informed by user feedback and design testing.
+
+**Benefits:**
+- **Reduces redundancy** - One section instead of two saves space
+- **Lowers cognitive load** - Cleaner interface, less visual noise
+- **Natural drop target** - Entire queue area is droppable, not just an empty box
+- **Better space utilization** - More room for task content
+
+#### Visual States
+
+The unified Queue section has 5 distinct visual states:
+
+**1. Default (Has Queued Tasks)**
+- Solid border with neutral color
+- Shows up to 3 tasks with title
+- "+N more" indicator if additional tasks queued
+
+**2. Drag Over + Success (Ready to Drop)**
+- Dashed **green** border (`border-success border-dashed`)
+- Light green background tint (`bg-success/10`)
+- Checkmark icon + "Drop to assign to {AgentName}" message
+- Subtle scale-up effect (`scale-105`)
+
+**3. Drag Over + Dependency Block (Cannot Drop)**
+- Dashed **red** border (`border-error border-dashed`)
+- Light red background tint (`bg-error/10`)
+- X icon + "Dependency Block!" header
+- Shows specific blocking task/reason
+- Drop is prevented (`dropEffect: none`)
+
+**4. Drag Over + File Conflict (Cannot Drop)**
+- Dashed **red** border (`border-error border-dashed`)
+- Light red background tint (`bg-error/10`)
+- Warning icon + "File Conflict!" header
+- Lists conflicting file patterns inline
+- Drop is prevented (`dropEffect: none`)
+
+**5. Assigning (Loading)**
+- Loading spinner animation
+- "Assigning task..." message
+- Disabled pointer events during assignment
+- Overlay with backdrop blur
+
+#### Drag-Drop Interaction Flow
+
+```
+1. User drags task from sidebar
+   ↓
+2. Mouse enters agent card → handleDragOver()
+   ↓
+3. Check task dependencies (analyzeDependencies)
+   ↓
+4. Check file reservation conflicts (detectConflicts)
+   ↓
+5. Show appropriate visual state (success/block/conflict)
+   ↓
+6. User drops → handleDrop()
+   ↓
+7. Validate dependencies/conflicts again
+   ↓
+8. Call API to assign task
+   ↓
+9. Show loading state, then success/error
+```
+
+#### Error Handling Approach
+
+Errors are displayed **inline** (not toasts/modals) for immediate context:
+
+- **Dependency blocks** - Shows which task needs to be completed first
+- **File conflicts** - Lists exact file patterns that conflict
+- **Assignment errors** - Displays API error message with 5-second auto-dismiss
+- **Detailed messages** - Users understand *why* action failed and how to fix it
+
+#### Implementation Details
+
+**State Management:**
+```svelte
+let isDragOver = $state(false);       // Is mouse over drop zone?
+let hasConflict = $state(false);      // Are there file conflicts?
+let hasDependencyBlock = $state(false); // Are dependencies unmet?
+let isAssigning = $state(false);      // Is assignment in progress?
+let assignError = $state(null);       // Assignment error message
+```
+
+**Drop Behavior:**
+- Entire queue section is a drop target (not just empty space)
+- Parent card component handles drop event (lines 183-235 in `AgentCard.svelte`)
+- Conflict detection runs on `dragover` (lines 322-344)
+- New tasks appear at **top** of queue after assignment
+- Visual feedback is immediate and reactive
+
+**File Location:**
+- Component: `src/lib/components/agents/AgentCard.svelte` (lines 627-693)
+- Documentation: Comprehensive comment block explains pattern rationale
+
+#### User Preferences That Informed Design
+
+This pattern emerged from user testing and feedback:
+
+✅ **Preferred:**
+- Cleaner, less busy interface
+- Inline error messages (not modals)
+- Entire section as drop target
+- Detailed, actionable error messages
+
+❌ **Rejected:**
+- Separate drop zone (felt redundant)
+- Toast/modal notifications (lose context)
+- Small drop zones (hard to target)
+- Generic error messages ("failed to assign")
+
+#### For Contributors
+
+When working with the Queue/Drop Zone pattern:
+
+1. **Keep visual feedback clear** - Colors and icons should be obvious
+2. **Show specific errors** - Tell users *exactly* what's wrong and how to fix it
+3. **Don't change drop target** - Entire section should remain droppable
+4. **Preserve states** - All 5 states serve a purpose, don't remove any
+5. **Test edge cases** - Try dragging tasks with dependencies, conflicts, etc.
+
+See code comments in `AgentCard.svelte` (lines 627-690) for detailed implementation notes.
+
 ## Development
 
 ### Available Scripts
