@@ -183,7 +183,7 @@ generate_battery_bar() {
 
 # If no agent name, show "not registered" status with git branch and context
 if [[ -z "$agent_name" ]]; then
-    base_status="${GRAY}jat${RESET} ${GRAY}|${RESET} ${CYAN}no agent registered${RESET}"
+    base_status="${GRAY}jat${RESET} ${GRAY}·${RESET} ${CYAN}no agent registered${RESET}"
 
     # Build second line with context battery and git branch
     second_line=""
@@ -390,9 +390,9 @@ if [[ -n "$task_id" ]]; then
                 priority_badge="${GRAY}[P${task_priority}]${RESET}"
                 ;;
         esac
-        status_line="${status_line} ${GRAY}|${RESET} ${priority_badge}"
+        status_line="${status_line} ${GRAY}·${RESET} ${priority_badge}"
     else
-        status_line="${status_line} ${GRAY}|${RESET}"
+        status_line="${status_line} ${GRAY}·${RESET}"
     fi
 
     # Add task type icon if available
@@ -415,7 +415,7 @@ if [[ -n "$task_id" ]]; then
 
 elif [[ -n "$agent_name" ]]; then
     # Agent registered but no active task - show idle (dimmed)
-    status_line="${status_line} ${GRAY}|${RESET} ${GRAY}idle${RESET}"
+    status_line="${status_line} ${GRAY}·${RESET} ${GRAY}idle${RESET}"
 else
     # Fallback
     status_line="${GRAY}jat${RESET}"
