@@ -517,13 +517,13 @@ fi
 
 # Add git branch
 if [[ -n "$git_branch" ]]; then
-    [[ -n "$second_line" ]] && second_line="${second_line}  "
+    [[ -n "$second_line" ]] && second_line="${second_line} ${GRAY}·${RESET} "
     second_line="${second_line}${MAGENTA}⎇${RESET} ${git_branch}"
 fi
 
-# Add indicators (no pipe, just extra spacing)
+# Add indicators
 if [[ -n "$indicators" ]]; then
-    [[ -n "$second_line" ]] && second_line="${second_line}  "
+    [[ -n "$second_line" ]] && second_line="${second_line} ${GRAY}·${RESET} "
     second_line="${second_line}${indicators}"
 fi
 
