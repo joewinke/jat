@@ -135,28 +135,28 @@ fi
 case "$MODE" in
   pause)
     # Simple pause - keep status as-is, add note
-    bd add "$TASK_ID" "Paused by $AGENT_NAME. Reason: ${REASON:-Taking a break}"
+    bd comment "$TASK_ID" "Paused by $AGENT_NAME. Reason: ${REASON:-Taking a break}"
     echo "⏸️  Paused task (status unchanged)"
     ;;
 
   blocked)
     # Mark as blocked
     bd update "$TASK_ID" --status blocked
-    bd add "$TASK_ID" "Blocked: $REASON (paused by $AGENT_NAME)"
+    bd comment "$TASK_ID" "Blocked: $REASON (paused by $AGENT_NAME)"
     echo "🚫 Marked task as blocked"
     ;;
 
   handoff)
     # Reassign to new agent
     bd update "$TASK_ID" --assignee "$HANDOFF_TO"
-    bd add "$TASK_ID" "Handed off from $AGENT_NAME to $HANDOFF_TO. Reason: $REASON"
+    bd comment "$TASK_ID" "Handed off from $AGENT_NAME to $HANDOFF_TO. Reason: $REASON"
     echo "👋 Handed off to $HANDOFF_TO"
     ;;
 
   abandon)
     # Unassign and mark as open
     bd update "$TASK_ID" --status open --assignee ""
-    bd add "$TASK_ID" "Abandoned by $AGENT_NAME. Reason: $REASON"
+    bd comment "$TASK_ID" "Abandoned by $AGENT_NAME. Reason: $REASON"
     echo "🛑 Abandoned task (now available for others)"
     ;;
 esac

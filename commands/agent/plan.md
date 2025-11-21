@@ -204,7 +204,7 @@ User: "This TypeScript error in UserService is annoying"
 11. **Set up dependencies:**
     ```bash
     # For each task that depends on another:
-    bd add <task-id> --depends <dependency-task-id>
+    bd dep add <task-id> <dependency-task-id>
     ```
 
 12. **Verify task structure:**
