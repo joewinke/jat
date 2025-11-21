@@ -382,16 +382,61 @@ const contextConfig = {
 
 ### Responsive Design
 
-**Breakpoints:**
-- **Small screens** (<640px): Icons only, labels hidden
-- **Medium screens** (640-1024px): Icons + selected labels
-- **Large screens** (>1024px): Icons + all labels
+The Nav component is fully responsive across all screen sizes, from mobile (320px) to large desktop (1920px+).
 
-**Implementation:**
+**Tailwind Breakpoints Used:**
+- `sm`: 640px (Small tablets and above)
+- `md`: 768px (Medium tablets and above)
+- `lg`: 1024px (Desktop and above)
+
+**Responsive Behavior by Viewport:**
+
+| Viewport | Width | Subtitle | View Buttons | Nav Links | Project Selector |
+|----------|-------|----------|--------------|-----------|------------------|
+| **Mobile** | 320px - 639px | Hidden | Icons only | Icons only | 144px (w-36) |
+| **Small Tablet** | 640px - 767px | Visible | Icons only | Icons only | 160px (w-40) |
+| **Tablet** | 768px - 1023px | Visible | Icons + Labels | Icons only | 192px (w-48) |
+| **Desktop** | 1024px+ | Visible | Icons + Labels | Icons + Labels | 192px (w-48) |
+| **Large Desktop** | 1920px+ | Visible | Icons + Labels | Icons + Labels | 192px (w-48) |
+
+**Implementation Details:**
+
 ```svelte
-<span class="hidden md:inline ml-1">List</span>  <!-- Shows on md+ -->
-<span class="hidden lg:inline ml-1">Home</span>  <!-- Shows on lg+ -->
+<!-- Subtitle: Hidden on mobile (<640px) -->
+<p class="text-sm text-base-content/70 hidden sm:block">
+  {config.subtitle}
+</p>
+
+<!-- View toggle labels: Visible on tablet+ (≥768px) -->
+<span class="hidden md:inline ml-1">List</span>
+<span class="hidden md:inline ml-1">Graph</span>
+
+<!-- Navigation link labels: Visible on desktop+ (≥1024px) -->
+<span class="hidden lg:inline ml-1">Home</span>
+<span class="hidden lg:inline ml-1">Agents</span>
+
+<!-- Project selector: Responsive width -->
+<div class="w-36 sm:w-40 md:w-48">
+  <ProjectSelector ... />
+</div>
 ```
+
+**Testing Results (Verified):**
+
+✅ **320px (iPhone SE):** Single-row layout, icon-only buttons, no subtitle
+✅ **768px (iPad):** Single-row layout, view toggle labels visible, subtitle visible
+✅ **1024px (Desktop):** Single-row layout, all labels visible
+✅ **1920px (Large Desktop):** Single-row layout, all labels visible, optimal spacing
+
+**Why No Hamburger Menu:**
+
+The Nav component does NOT use a hamburger menu because:
+1. **Icon-only mode is sufficient** - All controls remain accessible on mobile
+2. **Single-row guarantee** - flex-nowrap prevents wrapping even with all controls
+3. **Better UX** - Users can see all options without opening a menu
+4. **Fewer clicks** - Direct access to all navigation options
+
+If future pages add many more nav items, consider adding a hamburger menu for mobile.
 
 ### Layout Fix: No Wrapping
 
