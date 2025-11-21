@@ -1,10 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
+	import { replaceState } from '$app/navigation';
 	import DependencyGraph from '$lib/components/DependencyGraph.svelte';
 	import TimelineGantt from '$lib/components/graph/TimelineGantt.svelte';
 	import KanbanBoard from '$lib/components/graph/KanbanBoard.svelte';
 	import TaskDetailModal from '$lib/components/TaskDetailModal.svelte';
+	import Nav from '$lib/components/Nav.svelte';
+	import {
+		getProjectsFromTasks,
+		getTaskCountByProject
+	} from '$lib/utils/projectUtils';
 
 	// View mode state ('dependency' | 'timeline' | 'kanban')
 	let viewMode = $state('dependency');
@@ -20,22 +26,46 @@
 	let selectedPriority = $state('all');
 	let selectedStatus = $state('open');
 	let searchQuery = $state('');
+	let selectedProject = $state('All Projects');
 
-	// Read project from URL parameter (reactive to URL changes)
-	let projectParam = $state(null);
+	// Extract unique projects from ALL tasks (unfiltered)
+	const projects = $derived(getProjectsFromTasks(allTasks));
 
-	// Update projectParam when URL changes
+	// Get task count per project from ALL tasks (only count 'open' tasks)
+	const taskCounts = $derived(getTaskCountByProject(allTasks, 'open'));
+
+	// Handle project selection change
+	function handleProjectChange(project: string) {
+		selectedProject = project;
+
+		// Update URL parameter using SvelteKit's replaceState
+		const url = new URL(window.location.href);
+		if (project === 'All Projects') {
+			url.searchParams.delete('project');
+		} else {
+			url.searchParams.set('project', project);
+		}
+		replaceState(url, {});
+	}
+
+	// Sync selectedProject from URL params
 	$effect(() => {
-		projectParam = $page.url.searchParams.get('project');
+		const params = new URLSearchParams(window.location.search);
+		const projectParam = params.get('project');
+		if (projectParam && projectParam !== 'All Projects') {
+			selectedProject = projectParam;
+		} else {
+			selectedProject = 'All Projects';
+		}
 	});
 
 	// Filter tasks by project
 	const filteredTasks = $derived(() => {
-		if (!projectParam || projectParam === 'All Projects') {
+		if (!selectedProject || selectedProject === 'All Projects') {
 			return allTasks;
 		}
 		// Filter by project prefix (e.g., "jat-abc" matches "jat")
-		return allTasks.filter((task) => task.id.startsWith(projectParam + '-'));
+		return allTasks.filter((task) => task.id.startsWith(selectedProject + '-'));
 	});
 
 	// Fetch tasks
@@ -87,6 +117,14 @@
 </script>
 
 <div class="min-h-screen bg-base-200">
+	<!-- Header -->
+	<Nav
+		{projects}
+		{selectedProject}
+		onProjectChange={handleProjectChange}
+		{taskCounts}
+	/>
+
 	<!-- View Mode Toggle + Filters Bar -->
 	<div class="bg-base-100 border-b border-base-300 p-4">
 		<div class="flex flex-wrap items-center gap-4">
