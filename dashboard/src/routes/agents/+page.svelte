@@ -43,8 +43,8 @@
 		let activeAgents = 0;
 
 		agents.forEach(agent => {
-			// Count agents with tasks as active
-			if (agent.tasks && agent.tasks.length > 0) {
+			// Count agents as active if they have reservations or in-progress tasks
+			if (agent.active) {
 				activeAgents++;
 			}
 
@@ -216,13 +216,15 @@
 								<div class="stat-desc">Cost: {formatCost(systemStats().costToday)}</div>
 							</div>
 
-							<div class="stat">
-								<div class="stat-title">Total Tokens (Week)</div>
-								<div class="stat-value text-{getUsageColor(systemStats().tokensWeek, 'week')}">
-									{formatTokens(systemStats().tokensWeek)}
+							{#if systemStats().tokensWeek !== systemStats().tokensToday}
+								<div class="stat">
+									<div class="stat-title">Total Tokens (Week)</div>
+									<div class="stat-value text-{getUsageColor(systemStats().tokensWeek, 'week')}">
+										{formatTokens(systemStats().tokensWeek)}
+									</div>
+									<div class="stat-desc">Cost: {formatCost(systemStats().costWeek)}</div>
 								</div>
-								<div class="stat-desc">Cost: {formatCost(systemStats().costWeek)}</div>
-							</div>
+							{/if}
 
 							<div class="stat">
 								<div class="stat-title">Active Agents</div>
