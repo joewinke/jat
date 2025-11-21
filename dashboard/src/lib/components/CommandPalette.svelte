@@ -20,6 +20,8 @@
 	let searchQuery = $state('');
 	let selectedIndex = $state(0);
 	let searchInput: HTMLInputElement;
+	let resultsContainer: HTMLDivElement;
+	let isKeyboardNavigation = $state(false); // Track if user is using keyboard
 
 	// Task search state
 	let searchMode = $state<'actions' | 'tasks'>('actions'); // 'actions' = command palette, 'tasks' = task search
@@ -210,6 +212,7 @@
 		searchMode = 'actions'; // Reset to actions mode
 		tasks = [];
 		isLoadingTasks = false;
+		isKeyboardNavigation = false; // Reset keyboard navigation
 
 		// Focus input after modal opens
 		setTimeout(() => {
@@ -224,6 +227,7 @@
 		searchMode = 'actions'; // Reset to actions mode
 		tasks = [];
 		isLoadingTasks = false;
+		isKeyboardNavigation = false; // Reset keyboard navigation
 
 		// Clear any pending search timers
 		if (searchDebounceTimer) {
@@ -240,10 +244,12 @@
 		switch (e.key) {
 			case 'ArrowDown':
 				e.preventDefault();
+				isKeyboardNavigation = true;
 				selectedIndex = Math.min(selectedIndex + 1, maxIndex);
 				break;
 			case 'ArrowUp':
 				e.preventDefault();
+				isKeyboardNavigation = true;
 				selectedIndex = Math.max(selectedIndex - 1, 0);
 				break;
 			case 'Enter':
@@ -301,6 +307,20 @@
 	$effect(() => {
 		if (searchQuery) {
 			selectedIndex = 0;
+			isKeyboardNavigation = false; // Reset keyboard navigation when typing
+		}
+	});
+
+	// Scroll selected item into view when selection changes
+	$effect(() => {
+		if (isOpen && resultsContainer) {
+			const selectedButton = resultsContainer.querySelector(`[data-index="${selectedIndex}"]`);
+			if (selectedButton) {
+				selectedButton.scrollIntoView({
+					block: 'nearest',
+					behavior: 'smooth'
+				});
+			}
 		}
 	});
 </script>
@@ -360,7 +380,7 @@
 			</div>
 
 			<!-- Results list -->
-			<div class="max-h-96 overflow-y-auto">
+			<div class="max-h-96 overflow-y-auto" bind:this={resultsContainer}>
 				{#if searchMode === 'actions'}
 					<!-- Actions list -->
 					{#if filteredActions.length === 0}
@@ -369,19 +389,26 @@
 							<p class="text-sm">Try different search terms</p>
 						</div>
 					{:else}
-						<ul class="menu p-2">
+						<div class="p-2 space-y-1">
 							{#each filteredActions as action, index}
-								<li>
-									<button
-										type="button"
-										class="flex items-start gap-3 p-3 rounded-lg {index === selectedIndex
-											? 'bg-primary text-primary-content'
-											: ''}"
-										onclick={() => action.execute()}
-										onmouseenter={() => (selectedIndex = index)}
-									>
+								<button
+									type="button"
+									data-index={index}
+									class="flex items-start gap-3 p-3 rounded-lg w-full {index === selectedIndex
+										? 'bg-primary text-primary-content'
+										: 'hover:bg-base-200'}"
+									onclick={() => action.execute()}
+									onmouseenter={() => {
+										if (!isKeyboardNavigation) {
+											selectedIndex = index;
+										}
+									}}
+									onmousemove={() => {
+										isKeyboardNavigation = false;
+									}}
+								>
 										<span class="text-2xl flex-shrink-0">{action.icon}</span>
-										<div class="flex-1 text-left">
+										<div class="flex-1 text-left min-w-0">
 											<div class="font-medium">{action.label}</div>
 											<div
 												class="text-sm opacity-70 {index === selectedIndex
@@ -391,13 +418,12 @@
 												{action.description}
 											</div>
 										</div>
-										{#if index === selectedIndex}
-											<kbd class="kbd kbd-sm">↵</kbd>
-										{/if}
-									</button>
-								</li>
+									{#if index === selectedIndex}
+										<kbd class="kbd kbd-sm flex-shrink-0 bg-primary-content/20 text-primary-content border-primary-content/30">↵</kbd>
+									{/if}
+								</button>
 							{/each}
-						</ul>
+						</div>
 					{/if}
 				{:else}
 					<!-- Task search results -->
@@ -433,21 +459,28 @@
 								</div>
 
 								<!-- Tasks in this project -->
-								<ul class="menu p-0 mb-3">
+								<div class="mb-3 space-y-1">
 									{#each projectTasks as task}
 										{@const flatIndex = tasks.indexOf(task)}
-										<li>
-											<button
-												type="button"
-												class="flex items-start gap-3 p-3 rounded-lg {flatIndex === selectedIndex
-													? 'bg-primary text-primary-content'
-													: ''}"
-												onclick={() => {
-													goto(`/?task=${task.id}`);
-													close();
-												}}
-												onmouseenter={() => (selectedIndex = flatIndex)}
-											>
+										<button
+											type="button"
+											data-index={flatIndex}
+											class="flex items-start gap-3 p-3 rounded-lg w-full {flatIndex === selectedIndex
+												? 'bg-primary text-primary-content'
+												: 'hover:bg-base-200'}"
+											onclick={() => {
+												goto(`/?task=${task.id}`);
+												close();
+											}}
+											onmouseenter={() => {
+												if (!isKeyboardNavigation) {
+													selectedIndex = flatIndex;
+												}
+											}}
+											onmousemove={() => {
+												isKeyboardNavigation = false;
+											}}
+										>
 												<!-- Priority badge -->
 												<div class="flex-shrink-0">
 													<span
@@ -490,13 +523,12 @@
 														</div>
 													{/if}
 												</div>
-												{#if flatIndex === selectedIndex}
-													<kbd class="kbd kbd-sm">↵</kbd>
-												{/if}
-											</button>
-										</li>
+											{#if flatIndex === selectedIndex}
+												<kbd class="kbd kbd-sm flex-shrink-0 bg-primary-content/20 text-primary-content border-primary-content/30">↵</kbd>
+											{/if}
+										</button>
 									{/each}
-								</ul>
+								</div>
 							{/each}
 						</div>
 					{/if}
