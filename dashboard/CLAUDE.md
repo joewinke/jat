@@ -173,6 +173,58 @@ export function initializeTheme() {
 
 **Solution**: Update `app.css` to Tailwind v4 syntax with proper `@plugin "daisyui"` configuration.
 
+## DaisyUI Common Patterns
+
+### ⚠️ CRITICAL: Drawer Overlay Pattern
+
+**Problem:** Drawer overlay with BOTH `for="drawer-id"` and `onclick={handleClose}` creates double-toggle bug.
+
+```svelte
+<!-- ❌ WRONG - Causes drawer to refresh instead of close -->
+<div class="drawer-side">
+  <label
+    for="task-detail-drawer"
+    class="drawer-overlay"
+    onclick={handleClose}
+  ></label>
+</div>
+
+<!-- ✅ CORRECT - Remove 'for' when using custom onclick -->
+<div class="drawer-side">
+  <label
+    class="drawer-overlay"
+    onclick={handleClose}
+  ></label>
+</div>
+
+<!-- ✅ ALSO CORRECT - Use 'for' WITHOUT custom onclick (default DaisyUI) -->
+<div class="drawer-side">
+  <label
+    for="task-detail-drawer"
+    class="drawer-overlay"
+  ></label>
+</div>
+```
+
+**Why this happens:**
+1. Custom `onclick` handler sets `isOpen = false`
+2. `for` attribute triggers checkbox toggle (flips back to `true`)
+3. Reactive `$effect` sees state change, triggers `fetchTask()` → spinner shows
+4. Drawer appears to "refresh" instead of closing
+
+**Rule:** Choose ONE approach - custom handler OR checkbox toggle, never both.
+
+**When to use each:**
+- **Custom `onclick` handler** - When you need cleanup logic (clear forms, reset state)
+- **Default `for` toggle** - Simple drawers with no custom close behavior
+
+**Fixed in (November 2024):**
+- `TaskDetailDrawer.svelte` (line 467)
+- `TaskCreationDrawer.svelte` (line 222)
+- `AddAsset.svelte` in Chimaro project
+
+**See also:** `/home/jw/code/chimaro/src/lib/knowl/daisyui-drawer.md` for full DaisyUI drawer documentation.
+
 ## DaisyUI Configuration
 
 ### Tailwind Config (`tailwind.config.js`)
