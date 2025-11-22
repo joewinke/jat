@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 	import { getTokenColorClass, HIGH_USAGE_WARNING_THRESHOLD } from '$lib/config/tokenUsageConfig';
+	import { getActivityStatusConfig } from '$lib/config/activityStatusConfig';
 	import Sparkline from '$lib/components/Sparkline.svelte';
 
 	let { agent, tasks = [], allTasks = [], reservations = [], onTaskAssign = () => {}, ontaskclick = () => {}, draggedTaskId = null } = $props();
@@ -771,34 +772,54 @@
 		{/if}
 
 		<!-- Activity & History (Unified) -->
-		{#if agent.current_activity || (agent.activities && agent.activities.length > 1)}
+		{#if agent.current_activity || (agent.activities && agent.activities.length > 0)}
+			{@const firstActivity = agent.current_activity || (agent.activities && agent.activities.length > 0 ? agent.activities[0] : null)}
+			{@const isActiveTask = firstActivity && firstActivity.status !== 'closed'}
+			{@const currentActivity = isActiveTask ? firstActivity : null}
+			{@const historyActivities = currentActivity ? agent.activities.slice(1) : agent.activities}
 			<div class="mb-3 bg-base-200 rounded px-2 py-1.5">
 				<!-- Current Activity -->
-				{#if agent.current_activity}
-					{@const taskId = extractTaskId(agent.current_activity.preview)}
-					{@const previewText = agent.current_activity.preview || agent.current_activity.content || 'Active'}
+				{#if currentActivity}
+					{@const taskId = extractTaskId(currentActivity.preview)}
+					{@const previewText = currentActivity.preview || currentActivity.content || 'Active'}
 					{@const textWithoutTaskId = taskId ? previewText.replace(/\[.*?\]\s*/, '') : previewText}
+					{@const statusConfig = getActivityStatusConfig(currentActivity.status || 'in_progress')}
 					<div class="text-xs flex items-start gap-1.5 py-0.5">
-						<span class="inline-block w-2 h-2 bg-success rounded-full animate-pulse shrink-0 mt-0.5"></span>
-						{#if taskId}
-							<span class="font-mono text-success shrink-0 text-[10px] font-semibold">{taskId}</span>
+					{#if statusConfig.iconType === 'svg'}
+						{#if statusConfig.iconStyle === 'solid'}
+							<svg class="shrink-0 w-4 h-4 {statusConfig.color}" viewBox="0 0 24 24" fill="currentColor" title={statusConfig.description}>
+								<path d={statusConfig.icon} />
+							</svg>
+						{:else}
+							<svg class="shrink-0 w-4 h-4 {statusConfig.color}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" title={statusConfig.description}>
+								<path stroke-linecap="round" stroke-linejoin="round" d={statusConfig.icon} />
+							</svg>
 						{/if}
-						<span class="truncate font-semibold text-success">
+					{:else}
+						<span class="shrink-0 text-sm -mt-1 {statusConfig.color}" title={statusConfig.description}>
+							{statusConfig.icon}
+						</span>
+					{/if}
+						{#if taskId}
+							<span class="font-mono {statusConfig.color} shrink-0 text-[10px] font-semibold">{taskId}</span>
+						{/if}
+						<span class="truncate font-semibold {statusConfig.color}">
 							{textWithoutTaskId}
 						</span>
 					</div>
 				{/if}
 
 				<!-- History -->
-				{#if agent.activities && agent.activities.length > 1}
-					<div class="{agent.current_activity ? 'mt-2 pt-2 border-t border-base-300' : ''} space-y-1">
-						{#each agent.activities.slice(1) as activity}
+				{#if historyActivities && historyActivities.length > 0}
+					<div class="{currentActivity ? 'mt-2 pt-2 border-t border-base-300' : ''} space-y-1">
+						{#each historyActivities as activity}
 							{@const taskId = extractTaskId(activity.preview)}
 							{@const isClickable = taskId !== null}
 							{@const previewText = activity.preview || activity.content || activity.type}
 							{@const textWithoutTaskId = taskId ? previewText.replace(/\[.*?\]\s*/, '') : previewText}
-							<div
-								class="text-xs text-base-content/60 flex items-start gap-1.5 rounded px-1 py-0.5 {isClickable ? 'hover:bg-primary/10 cursor-pointer' : 'hover:bg-base-300 cursor-help'}"
+							{@const statusConfig = getActivityStatusConfig(activity.status || 'open')}
+						<div
+							class="text-xs text-base-content/60 flex items-start gap-1.5 rounded px-1 py-0.5 {isClickable ? 'hover:bg-primary/10 cursor-pointer' : 'hover:bg-base-300 cursor-help'}"
 								title={activity.content || activity.preview}
 								onclick={isClickable ? () => handleActivityClick(activity) : undefined}
 								role={isClickable ? 'button' : undefined}
@@ -807,6 +828,21 @@
 								<span class="text-base-content/40 shrink-0 font-mono text-[10px]">
 									{new Date(activity.ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
 								</span>
+								{#if statusConfig.iconType === 'svg'}
+								{#if statusConfig.iconStyle === 'solid'}
+									<svg class="shrink-0 w-3.5 h-3.5 {statusConfig.color}" viewBox="0 0 24 24" fill="currentColor" title={statusConfig.description}>
+										<path d={statusConfig.icon} />
+									</svg>
+								{:else}
+									<svg class="shrink-0 w-3.5 h-3.5 {statusConfig.color}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" title={statusConfig.description}>
+										<path stroke-linecap="round" stroke-linejoin="round" d={statusConfig.icon} />
+									</svg>
+								{/if}
+							{:else}
+								<span class="shrink-0 text-xs -mt-0.5 {statusConfig.color}" title={statusConfig.description}>
+									{statusConfig.icon}
+								</span>
+							{/if}
 								{#if taskId}
 									<span class="font-mono text-info shrink-0 text-[10px]">{taskId}</span>
 								{/if}

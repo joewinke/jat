@@ -69,19 +69,8 @@ export function getBeadsActivities(agentName, allTasks) {
 		.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
 		.slice(0, 10)
 		.map(task => {
-			// Generate preview text based on task status
-			let preview = `[${task.id}] ${task.title}`;
-
-			// Add status indicator to preview
-			if (task.status === 'closed') {
-				preview = `[${task.id}] Completed: ${task.title}`;
-			} else if (task.status === 'in_progress') {
-				preview = `[${task.id}] Working: ${task.title}`;
-			} else if (task.status === 'blocked') {
-				preview = `[${task.id}] Blocked: ${task.title}`;
-			} else if (task.status === 'open') {
-				preview = `[${task.id}] Starting: ${task.title}`;
-			}
+			// Generate simple preview text (no status prefix)
+			const preview = `[${task.id}] ${task.title}`;
 
 			// Determine activity type based on task status
 			let type = 'message';
@@ -95,7 +84,8 @@ export function getBeadsActivities(agentName, allTasks) {
 				ts: task.updated_at,
 				preview: preview,
 				content: task.description || task.title,
-				type: type
+				type: type,
+				status: task.status  // Include task status for icon rendering
 			};
 		});
 
