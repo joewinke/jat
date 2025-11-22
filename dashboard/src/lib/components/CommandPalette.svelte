@@ -52,13 +52,13 @@
 			}
 		},
 		{
-			id: 'nav-graph',
-			label: 'Go to Graph',
+			id: 'nav-dependency',
+			label: 'Go to Dependency',
 			description: 'View task dependency graph and relationships',
 			icon: '🔗',
-			keywords: ['graph', 'dependency', 'relationships', 'deps'],
+			keywords: ['dependency', 'graph', 'relationships', 'deps'],
 			execute: () => {
-				goto('/graph');
+				goto('/dependency');
 				close();
 			}
 		},
