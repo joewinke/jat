@@ -50,9 +50,14 @@
 
 	// Help modal state
 	let showHelpModal = $state(false);
+	let activeHelpTab = $state('keyboard'); // 'keyboard', 'commands', 'readme'
 
 	function toggleHelp() {
 		showHelpModal = !showHelpModal;
+	}
+
+	function setHelpTab(tab: string) {
+		activeHelpTab = tab;
 	}
 </script>
 
@@ -122,10 +127,10 @@
 <!-- Help Guide Modal -->
 {#if showHelpModal}
 	<div class="modal modal-open">
-		<div class="modal-box max-w-4xl">
+		<div class="modal-box max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
 			<!-- Header -->
-			<div class="flex items-center justify-between mb-6">
-				<h3 class="text-2xl font-bold">Keyboard Shortcuts</h3>
+			<div class="flex items-center justify-between mb-4">
+				<h3 class="text-2xl font-bold">Help & Reference</h3>
 				<button
 					class="btn btn-sm btn-circle btn-ghost"
 					onclick={toggleHelp}
@@ -135,203 +140,535 @@
 				</button>
 			</div>
 
-			<!-- Content Sections -->
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-				<!-- Global Shortcuts -->
-				<div>
-					<h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-5 w-5"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-							/>
-						</svg>
-						Global
-					</h4>
-					<div class="space-y-2">
-						<div class="flex justify-between items-center">
-							<span class="text-sm">Open command palette</span>
-							<span class="flex gap-1">
-								<kbd class="kbd kbd-sm">Cmd</kbd>
-								<span>+</span>
-								<kbd class="kbd kbd-sm">K</kbd>
-							</span>
-						</div>
-						<div class="flex justify-between items-center">
-							<span class="text-sm">Show help guide</span>
-							<span class="flex gap-1">
-								<kbd class="kbd kbd-sm">Ctrl</kbd>
-								<span>+</span>
-								<kbd class="kbd kbd-sm">/</kbd>
-							</span>
-						</div>
-					</div>
-				</div>
-
-				<!-- Task Drawer Shortcuts -->
-				<div>
-					<h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-5 w-5"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-							/>
-						</svg>
-						Task Drawer
-					</h4>
-					<div class="space-y-2">
-						<div class="flex justify-between items-center">
-							<span class="text-sm">Close drawer</span>
-							<kbd class="kbd kbd-sm">Esc</kbd>
-						</div>
-						<div class="flex justify-between items-center">
-							<span class="text-sm">Toggle edit mode</span>
-							<kbd class="kbd kbd-sm">E</kbd>
-						</div>
-						<div class="flex justify-between items-center">
-							<span class="text-sm">Mark complete</span>
-							<kbd class="kbd kbd-sm">M</kbd>
-						</div>
-					</div>
-				</div>
-
-				<!-- Navigation Shortcuts -->
-				<div>
-					<h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-5 w-5"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M13 10V3L4 14h7v7l9-11h-7z"
-							/>
-						</svg>
-						Navigation
-					</h4>
-					<div class="space-y-2">
-						<div class="flex justify-between items-center">
-							<span class="text-sm">Go to List view</span>
-							<kbd class="kbd kbd-sm">G</kbd>
-							<span>then</span>
-							<kbd class="kbd kbd-sm">L</kbd>
-						</div>
-						<div class="flex justify-between items-center">
-							<span class="text-sm">Go to Agents view</span>
-							<kbd class="kbd kbd-sm">G</kbd>
-							<span>then</span>
-							<kbd class="kbd kbd-sm">A</kbd>
-						</div>
-					</div>
-				</div>
-
-				<!-- Status Indicators -->
-				<div>
-					<h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-5 w-5"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-							/>
-						</svg>
-						Status Indicators
-					</h4>
-					<div class="space-y-2">
-						<div class="flex justify-between items-center">
-							<span class="text-sm">Open</span>
-							<span class="badge badge-info">open</span>
-						</div>
-						<div class="flex justify-between items-center">
-							<span class="text-sm">In Progress</span>
-							<span class="badge badge-warning">in_progress</span>
-						</div>
-						<div class="flex justify-between items-center">
-							<span class="text-sm">Blocked</span>
-							<span class="badge badge-error">blocked</span>
-						</div>
-						<div class="flex justify-between items-center">
-							<span class="text-sm">Closed</span>
-							<span class="badge badge-success">closed</span>
-						</div>
-					</div>
-				</div>
+			<!-- Tabs -->
+			<div role="tablist" class="tabs tabs-lifted mb-4">
+				<button
+					role="tab"
+					class="tab {activeHelpTab === 'commands' ? 'tab-active' : ''}"
+					onclick={() => setHelpTab('commands')}
+				>
+					Agent Commands
+				</button>
+				<button
+					role="tab"
+					class="tab {activeHelpTab === 'keyboard' ? 'tab-active' : ''}"
+					onclick={() => setHelpTab('keyboard')}
+				>
+					Keyboard Shortcuts
+				</button>
+				<button
+					role="tab"
+					class="tab {activeHelpTab === 'readme' ? 'tab-active' : ''}"
+					onclick={() => setHelpTab('readme')}
+				>
+					README
+				</button>
 			</div>
 
-			<!-- Divider -->
-			<div class="divider my-6"></div>
+			<!-- Tab Content (scrollable) -->
+			<div class="flex-1 overflow-y-auto">
+				<!-- Agent Commands Tab -->
+				{#if activeHelpTab === 'commands'}
+					<div class="space-y-6">
+						<div class="alert alert-info">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								class="stroke-current shrink-0 w-5 h-5"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+								></path>
+							</svg>
+							<span class="text-sm"
+								>7 commands for multi-agent orchestration. See full docs in COMMANDS.md</span
+							>
+						</div>
 
-			<!-- Tips Section -->
-			<div>
-				<h4 class="text-lg font-semibold mb-3">Tips</h4>
-				<div class="space-y-2">
-					<div class="alert alert-info">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-							class="stroke-current shrink-0 w-5 h-5"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-							></path>
-						</svg>
-						<span class="text-sm"
-							>Use <kbd class="kbd kbd-sm">Cmd+K</kbd> to quickly navigate, search tasks, and perform
-							actions.</span
-						>
+						<!-- Core Workflow Commands -->
+						<div>
+							<h4 class="text-lg font-semibold mb-3">Core Workflow (4 commands)</h4>
+
+							<!-- /agent:start -->
+							<div class="mb-4">
+								<h5 class="text-md font-semibold mb-2">/agent:start - Get to Work</h5>
+								<div class="mockup-code text-xs mb-2">
+									<pre><code>/agent:start                    # Auto-create new agent (fast!)</code></pre>
+									<pre><code>/agent:start resume             # Choose from logged-out agents</code></pre>
+									<pre><code>/agent:start GreatWind          # Resume specific agent by name</code></pre>
+									<pre><code>/agent:start quick              # Start highest priority task immediately</code></pre>
+									<pre><code>/agent:start task-abc           # Start specific task (with checks)</code></pre>
+									<pre><code>/agent:start task-abc quick     # Start specific task (skip checks)</code></pre>
+								</div>
+								<p class="text-sm text-base-content/70">
+									Smart registration (auto-create or resume) → Session persistence → Task selection
+									→ Conflict detection → Actually starts work
+								</p>
+							</div>
+
+							<!-- /agent:next -->
+							<div class="mb-4">
+								<h5 class="text-md font-semibold mb-2">/agent:next - Drive Mode (Auto-Continue)</h5>
+								<div class="mockup-code text-xs mb-2">
+									<pre><code>/agent:next                     # Full verify + commit + auto-start next</code></pre>
+									<pre><code>/agent:next quick               # Quick commit + auto-start next (skip verify)</code></pre>
+								</div>
+								<p class="text-sm text-base-content/70">
+									Verify → Commit → Acknowledge Mail → Announce → Mark complete → Release locks →
+									Auto-start next task (continuous flow)
+								</p>
+							</div>
+
+							<!-- /agent:complete -->
+							<div class="mb-4">
+								<h5 class="text-md font-semibold mb-2">
+									/agent:complete - Finish Properly (Manual Selection)
+								</h5>
+								<div class="mockup-code text-xs mb-2">
+									<pre><code>/agent:complete                 # Full verify + show menu + recommended next</code></pre>
+								</div>
+								<p class="text-sm text-base-content/70">
+									Same as /agent:next but shows available tasks menu instead of auto-continuing. Use
+									when you want to choose next task manually.
+								</p>
+							</div>
+
+							<!-- /agent:pause -->
+							<div class="mb-4">
+								<h5 class="text-md font-semibold mb-2">
+									/agent:pause - Quick Pivot (Context Switch)
+								</h5>
+								<div class="mockup-code text-xs mb-2">
+									<pre><code>/agent:pause                    # Quick exit + show menu</code></pre>
+								</div>
+								<p class="text-sm text-base-content/70">
+									Quick commit/stash → Acknowledge Mail → Release locks → Show available tasks menu.
+									Use for emergency exit or context switch.
+								</p>
+							</div>
+						</div>
+
+						<!-- Support Commands -->
+						<div>
+							<h4 class="text-lg font-semibold mb-3">Support Commands (3 commands)</h4>
+
+							<!-- /agent:status -->
+							<div class="mb-4">
+								<h5 class="text-md font-semibold mb-2">/agent:status - Check Current Work</h5>
+								<div class="mockup-code text-xs mb-2">
+									<pre><code>/agent:status                   # Shows current task, locks, messages</code></pre>
+								</div>
+								<p class="text-sm text-base-content/70">
+									Shows current task progress, active file reservations, unread Agent Mail messages,
+									and team sync.
+								</p>
+							</div>
+
+							<!-- /agent:verify -->
+							<div class="mb-4">
+								<h5 class="text-md font-semibold mb-2">/agent:verify - Quality Checks</h5>
+								<div class="mockup-code text-xs mb-2">
+									<pre><code>/agent:verify                   # Verify current task</code></pre>
+									<pre><code>/agent:verify task-abc          # Verify specific task</code></pre>
+								</div>
+								<p class="text-sm text-base-content/70">
+									Runs tests, lint, security checks, and browser tests (if applicable). Must pass
+									before /agent:complete.
+								</p>
+							</div>
+
+							<!-- /agent:plan -->
+							<div class="mb-4">
+								<h5 class="text-md font-semibold mb-2">
+									/agent:plan - Convert Planning to Tasks
+								</h5>
+								<div class="mockup-code text-xs mb-2">
+									<pre><code>/agent:plan                     # Analyze conversation/PRD, create tasks</code></pre>
+								</div>
+								<p class="text-sm text-base-content/70">
+									Analyzes conversation history OR written PRD, breaks work into atomic tasks,
+									creates Beads tasks with proper dependency chains.
+								</p>
+							</div>
+						</div>
+
+						<!-- Quick Tips -->
+						<div>
+							<h4 class="text-lg font-semibold mb-3">Quick Tips</h4>
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+								<div class="alert alert-success">
+									<span class="text-sm"
+										><strong>Speed:</strong> Use `/agent:start quick` and `/agent:next quick` for rapid
+										iteration</span
+									>
+								</div>
+								<div class="alert alert-info">
+									<span class="text-sm"
+										><strong>Control:</strong> Use `/agent:complete` when you want to choose next task
+										manually</span
+									>
+								</div>
+								<div class="alert alert-warning">
+									<span class="text-sm"
+										><strong>Quality:</strong> Always run `/agent:verify` before `/agent:complete` for
+										critical work</span
+									>
+								</div>
+								<div class="alert">
+									<span class="text-sm"
+										><strong>Coordination:</strong> All commands acknowledge Agent Mail and announce
+										completion</span
+									>
+								</div>
+							</div>
+						</div>
 					</div>
-					<div class="alert alert-info">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-							class="stroke-current shrink-0 w-5 h-5"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-							></path>
-						</svg>
-						<span class="text-sm"
-							>Click any task card to open details. Press <kbd class="kbd kbd-sm">?</kbd> inside the
-							drawer for more shortcuts.</span
-						>
+				{/if}
+
+				<!-- Keyboard Shortcuts Tab -->
+				{#if activeHelpTab === 'keyboard'}
+					<div class="space-y-6">
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+							<!-- Global Shortcuts -->
+							<div>
+								<h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="h-5 w-5"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+										/>
+									</svg>
+									Global
+								</h4>
+								<div class="space-y-2">
+									<div class="flex justify-between items-center">
+										<span class="text-sm">Open command palette</span>
+										<span class="flex gap-1">
+											<kbd class="kbd kbd-sm">Cmd</kbd>
+											<span>+</span>
+											<kbd class="kbd kbd-sm">K</kbd>
+										</span>
+									</div>
+									<div class="flex justify-between items-center">
+										<span class="text-sm">Show help guide</span>
+										<span class="flex gap-1">
+											<kbd class="kbd kbd-sm">Ctrl</kbd>
+											<span>+</span>
+											<kbd class="kbd kbd-sm">/</kbd>
+										</span>
+									</div>
+								</div>
+							</div>
+
+							<!-- Task Drawer Shortcuts -->
+							<div>
+								<h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="h-5 w-5"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+										/>
+									</svg>
+									Task Drawer
+								</h4>
+								<div class="space-y-2">
+									<div class="flex justify-between items-center">
+										<span class="text-sm">Close drawer</span>
+										<kbd class="kbd kbd-sm">Esc</kbd>
+									</div>
+									<div class="flex justify-between items-center">
+										<span class="text-sm">Toggle edit mode</span>
+										<kbd class="kbd kbd-sm">E</kbd>
+									</div>
+									<div class="flex justify-between items-center">
+										<span class="text-sm">Mark complete</span>
+										<kbd class="kbd kbd-sm">M</kbd>
+									</div>
+								</div>
+							</div>
+
+							<!-- Navigation Shortcuts -->
+							<div>
+								<h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="h-5 w-5"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M13 10V3L4 14h7v7l9-11h-7z"
+										/>
+									</svg>
+									Navigation
+								</h4>
+								<div class="space-y-2">
+									<div class="flex justify-between items-center">
+										<span class="text-sm">Go to List view</span>
+										<kbd class="kbd kbd-sm">G</kbd>
+										<span>then</span>
+										<kbd class="kbd kbd-sm">L</kbd>
+									</div>
+									<div class="flex justify-between items-center">
+										<span class="text-sm">Go to Agents view</span>
+										<kbd class="kbd kbd-sm">G</kbd>
+										<span>then</span>
+										<kbd class="kbd kbd-sm">A</kbd>
+									</div>
+								</div>
+							</div>
+
+							<!-- Status Indicators -->
+							<div>
+								<h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="h-5 w-5"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+										/>
+									</svg>
+									Status Indicators
+								</h4>
+								<div class="space-y-2">
+									<div class="flex justify-between items-center">
+										<span class="text-sm">Open</span>
+										<span class="badge badge-info">open</span>
+									</div>
+									<div class="flex justify-between items-center">
+										<span class="text-sm">In Progress</span>
+										<span class="badge badge-warning">in_progress</span>
+									</div>
+									<div class="flex justify-between items-center">
+										<span class="text-sm">Blocked</span>
+										<span class="badge badge-error">blocked</span>
+									</div>
+									<div class="flex justify-between items-center">
+										<span class="text-sm">Closed</span>
+										<span class="badge badge-success">closed</span>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- Divider -->
+						<div class="divider my-6"></div>
+
+						<!-- Tips Section -->
+						<div>
+							<h4 class="text-lg font-semibold mb-3">Tips</h4>
+							<div class="space-y-2">
+								<div class="alert alert-info">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+										class="stroke-current shrink-0 w-5 h-5"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+										></path>
+									</svg>
+									<span class="text-sm"
+										>Use <kbd class="kbd kbd-sm">Cmd+K</kbd> to quickly navigate, search tasks, and
+										perform actions.</span
+									>
+								</div>
+								<div class="alert alert-info">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+										class="stroke-current shrink-0 w-5 h-5"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+										></path>
+									</svg>
+									<span class="text-sm"
+										>Click any task card to open details. Press <kbd class="kbd kbd-sm">?</kbd> inside
+										the drawer for more shortcuts.</span
+									>
+								</div>
+							</div>
+						</div>
 					</div>
-				</div>
+				{/if}
+
+				<!-- README Tab -->
+				{#if activeHelpTab === 'readme'}
+					<div class="space-y-6">
+						<!-- Quick Start -->
+						<div>
+							<h4 class="text-lg font-semibold mb-3">Quick Start</h4>
+							<div class="mockup-code text-xs">
+								<pre><code># 1. Install (run in your terminal/bash)</code></pre>
+								<pre><code>curl -fsSL https://raw.githubusercontent.com/joewinke/jat/main/install.sh | bash</code></pre>
+								<pre><code></code></pre>
+								<pre><code># 2. Initialize Beads in your project</code></pre>
+								<pre><code>bd init</code></pre>
+								<pre><code></code></pre>
+								<pre><code># 3. Start working (registers agent + picks task)</code></pre>
+								<pre><code>/agent:start</code></pre>
+							</div>
+						</div>
+
+						<!-- What Is This -->
+						<div>
+							<h4 class="text-lg font-semibold mb-3">What Is JAT?</h4>
+							<p class="text-sm text-base-content/70 mb-3">
+								Jomarchy Agent Tools is a <strong>self-contained AI development environment</strong> that
+								gives your AI coding assistants (Claude Code, Cline, Codex, etc.) the ability to:
+							</p>
+							<ul class="list-disc list-inside text-sm text-base-content/70 space-y-1">
+								<li>
+									<strong>Command</strong> agent swarms with high-level coordination primitives
+								</li>
+								<li>
+									<strong>Coordinate</strong> across multiple agents without conflicts (Agent Mail messaging
+									+ file locks)
+								</li>
+								<li>
+									<strong>Transcend</strong> project folders and context window bounds with persistent state
+								</li>
+								<li>
+									<strong>Plan</strong> work with dependency-aware task management (Beads)
+								</li>
+								<li>
+									<strong>Execute</strong> with 28 composable bash tools (no HTTP servers, no running daemons)
+								</li>
+								<li><strong>Scale</strong> infinitely - add agents without coordination overhead</li>
+							</ul>
+						</div>
+
+						<!-- Architecture -->
+						<div>
+							<h4 class="text-lg font-semibold mb-3">Architecture</h4>
+							<div class="mockup-code text-xs">
+								<pre><code>┌─────────────────────────────────────────┐</code></pre>
+								<pre><code>│      AI Coding Assistants (Any)         │</code></pre>
+								<pre><code>└─────────────┬───────────────────────────┘</code></pre>
+								<pre><code>              ▼</code></pre>
+								<pre><code>    ┌────────────────────┐</code></pre>
+								<pre><code>    │ Coordination Layer │</code></pre>
+								<pre><code>    │  7 Slash Commands  │</code></pre>
+								<pre><code>    └────────┬───────────┘</code></pre>
+								<pre><code>             │</code></pre>
+								<pre><code>  ┌──────────┼──────────┐</code></pre>
+								<pre><code>  ▼          ▼          ▼</code></pre>
+								<pre><code>Agent    Beads    28 Tools</code></pre>
+								<pre><code> Mail      CLI     (bash)</code></pre>
+							</div>
+						</div>
+
+						<!-- Key Features -->
+						<div>
+							<h4 class="text-lg font-semibold mb-3">Key Features</h4>
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+								<div class="alert alert-info">
+									<span class="text-sm"
+										><strong>Agent Mail:</strong> Multi-agent coordination with messaging + file locks</span
+									>
+								</div>
+								<div class="alert alert-success">
+									<span class="text-sm"
+										><strong>Beads:</strong> Dependency-aware task planning with CLI</span
+									>
+								</div>
+								<div class="alert alert-warning">
+									<span class="text-sm"
+										><strong>28 Tools:</strong> Database, browser, monitoring, dev tools</span
+									>
+								</div>
+								<div class="alert">
+									<span class="text-sm"
+										><strong>Dashboard:</strong> Real-time multi-project task visualization</span
+									>
+								</div>
+							</div>
+						</div>
+
+						<!-- Common Workflows -->
+						<div>
+							<h4 class="text-lg font-semibold mb-3">Common Workflows</h4>
+
+							<h5 class="text-md font-semibold mb-2">Drive Mode (Continuous Flow)</h5>
+							<div class="mockup-code text-xs mb-3">
+								<pre><code>/agent:start                    # Create agent</code></pre>
+								<pre><code>/agent:start task-abc           # Start first task</code></pre>
+								<pre><code>/agent:next                     # Complete + auto-start next</code></pre>
+								<pre><code>/agent:next                     # Complete + auto-start next</code></pre>
+								<pre><code># ... continuous loop, never stops ...</code></pre>
+							</div>
+
+							<h5 class="text-md font-semibold mb-2">Manual Mode (Careful Selection)</h5>
+							<div class="mockup-code text-xs mb-3">
+								<pre><code>/agent:start                    # Create agent</code></pre>
+								<pre><code>/agent:start task-abc           # Start task</code></pre>
+								<pre><code>/agent:complete                 # Complete + show menu</code></pre>
+								<pre><code># Review recommendations...</code></pre>
+								<pre><code>/agent:start task-xyz           # Pick manually</code></pre>
+							</div>
+						</div>
+
+						<!-- Links -->
+						<div>
+							<h4 class="text-lg font-semibold mb-3">Learn More</h4>
+							<div class="flex flex-col gap-2">
+								<a
+									href="https://github.com/joewinke/jat"
+									target="_blank"
+									class="btn btn-sm btn-primary"
+								>
+									GitHub Repository
+								</a>
+								<a href="/COMMANDS.md" target="_blank" class="btn btn-sm btn-outline">
+									Full Command Reference
+								</a>
+								<a href="/README.md" target="_blank" class="btn btn-sm btn-outline">
+									Complete README
+								</a>
+							</div>
+						</div>
+					</div>
+				{/if}
 			</div>
 
 			<!-- Footer -->
